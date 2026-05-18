@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard — H-2 Visa Scanner Pro</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap');
+    :root{--bg:#020408;--panel:#0a0a0f;--soft:#0f172a;--border:#1e293b;--text:#f1f5f9;--muted:#64748b;--sub:#94a3b8;--green:#22c55e;--blue:#60a5fa;--yellow:#f59e0b;--red:#f87171;--purple:#a78bfa}
+    *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif} body{min-height:100vh;padding:22px}.hidden{display:none!important}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}.brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1d4ed8,#7c3aed);font-size:22px}.title{font-family:'Syne',sans-serif;font-weight:800;font-size:22px}.subtitle{font:11px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.8px;margin-top:3px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border);background:var(--soft);color:var(--sub);border-radius:8px;padding:9px 12px;text-decoration:none;cursor:pointer;font-weight:800;font-size:12px}.btn:hover{border-color:var(--blue);color:#fff}.danger{border-color:#7f1d1d;color:var(--red)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}.metric-label{font:11px 'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:1px}.metric-value{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:800;margin-top:5px}.green{color:var(--green)}.blue{color:var(--blue)}.yellow{color:var(--yellow)}.purple{color:var(--purple)}.red{color:var(--red)}
+    .two{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.item{border-top:1px solid var(--border);padding:11px 0}.item:first-of-type{border-top:none}.item-title{font-weight:800}.item-meta{color:var(--sub);font-size:12px;margin-top:4px;line-height:1.5}.badge{display:inline-flex;margin-top:6px;margin-right:6px;border:1px solid #334155;border-radius:999px;padding:2px 8px;color:var(--sub);font:10px 'JetBrains Mono',monospace}.badge.online{border-color:#16a34a;color:#4ade80}.badge.offline{border-color:#334155;color:#64748b}.chart{height:180px;display:flex;align-items:end;gap:10px;padding-top:14px}.bar-wrap{flex:1;text-align:center}.bar-box{height:130px;display:flex;align-items:end;justify-content:center}.bar{width:70%;min-height:3px;border-radius:8px 8px 2px 2px;background:linear-gradient(180deg,#60a5fa,#1d4ed8)}.bar-label{font:10px 'JetBrains Mono',monospace;color:#94a3b8;margin-top:7px}.error{background:#1c0a0a;border:1px solid #991b1b;color:#fca5a5;border-radius:10px;padding:14px}.note{color:#64748b;font-size:12px;line-height:1.6;margin-top:10px}@media(max-width:900px){body{padding:14px}.two{grid-template-columns:1fr}.title{font-size:18px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="logo">👑</div><div><div class="title">Dashboard Administrativo</div><div class="subtitle">USUÁRIOS · ATIVIDADE · PRESENÇA ONLINE · USO</div></div></div>
+    <div class="actions"><a class="btn" href="/">← Scanner</a><a class="btn" href="/dashboard.html">📊 Dashboard do usuário</a><button class="btn" onclick="loadDashboard()">🔄 Atualizar</button><button class="btn danger" onclick="logout()">⏏ Sair</button></div>
+  </header>
+  <div id="error" class="error hidden"></div>
+  <section class="grid" id="metrics"></section>
+  <section class="two">
+    <div class="card"><h2 style="margin-top:0;font-family:'Syne',sans-serif">📈 Logins dos últimos 7 dias</h2><div id="chart" class="chart"></div><div class="note">O gráfico é calculado pelo campo <b>last_login</b>. Em versão futura, o ideal é registrar eventos reais de acesso e varredura em tabela própria.</div></div>
+    <div class="card"><h2 style="margin-top:0;font-family:'Syne',sans-serif">🤖 Status de IA</h2><div id="ai"></div></div>
+  </section>
+  <section class="card" style="margin-top:14px"><h2 style="margin-top:0;font-family:'Syne',sans-serif">👥 Usuários recentes</h2><div id="users"></div></section>
+<script>
+  const token = localStorage.getItem('h2_token');
+  const parseJwt = t => { try { return JSON.parse(atob(t.split('.')[1])); } catch { return null; } };
+  const currentUser = parseJwt(token || '');
+  function showError(msg){ const el=document.getElementById('error'); el.textContent='❌ '+msg; el.classList.remove('hidden'); }
+  function api(path){ return fetch(path,{headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}}); }
+  function safe(v){ return String(v || '—'); }
+  function isOnline(u){ const raw = u.last_seen || u.last_login; if(!raw) return false; const t = new Date(String(raw).replace(' ','T')+'Z').getTime(); return !Number.isNaN(t) && Date.now()-t <= 5*60*1000; }
+  function dayKey(d){ return d.toISOString().slice(0,10); }
+  function logout(){ localStorage.removeItem('h2_token'); location.href='/'; }
+  if(!token || !currentUser || currentUser.role !== 'admin'){ showError('Acesso restrito ao administrador. Faça login como admin.'); }
+  async function loadDashboard(){
+    if(!token || !currentUser || currentUser.role !== 'admin') return;
+    document.getElementById('error').classList.add('hidden');
+    try{
+      const [usersRes, aiRes] = await Promise.all([api('/api/admin/users'), api('/api/ai/status')]);
+      const users = await usersRes.json(); const ai = await aiRes.json();
+      if(!usersRes.ok) throw new Error(users.error || 'Erro ao carregar usuários');
+      render(users, aiRes.ok ? ai : null);
+    }catch(e){ showError(e.message); }
+  }
+  function render(users, ai){
+    const today = dayKey(new Date());
+    const stats = {
+      total: users.length,
+      active: users.filter(u=>Number(u.active)===1).length,
+      online: users.filter(isOnline).length,
+      admins: users.filter(u=>u.role==='admin').length,
+      loginsToday: users.filter(u=>String(u.last_login||'').slice(0,10)===today).length,
+    };
+    document.getElementById('metrics').innerHTML = metric('Usuários',stats.total,'blue')+metric('Ativos',stats.active,'green')+metric('Online agora',stats.online,'green')+metric('Admins',stats.admins,'purple')+metric('Logins hoje',stats.loginsToday,'yellow');
+    const days = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(6-i)); return dayKey(d); });
+    const chart = days.map(day=>({day,value:users.filter(u=>String(u.last_login||'').slice(0,10)===day).length}));
+    const max = Math.max(1,...chart.map(x=>x.value));
+    document.getElementById('chart').innerHTML = chart.map(x=>`<div class="bar-wrap"><div class="bar-box"><div class="bar" style="height:${Math.max(3,(x.value/max)*100)}%" title="${x.day}: ${x.value}"></div></div><div class="bar-label">${x.day.slice(5)}</div><div class="bar-label">${x.value}</div></div>`).join('');
+    const providers = ai?.providers || {};
+    document.getElementById('ai').innerHTML = Object.entries(providers).length ? Object.entries(providers).map(([k,p])=>`<div class="item"><div class="item-title">${safe(p.label)}</div><span class="badge ${p.online?'online':'offline'}">${p.online?'ONLINE':'OFFLINE'}</span><span class="badge">${p.configured?'CONFIGURADO':'NÃO CONFIGURADO'}</span></div>`).join('') : '<div class="item-meta">Status de IA indisponível.</div>';
+    const recent = [...users].sort((a,b)=>String(b.last_login||b.created_at||'').localeCompare(String(a.last_login||a.created_at||''))).slice(0,12);
+    document.getElementById('users').innerHTML = recent.length ? recent.map(u=>`<div class="item"><div class="item-title">${safe(u.username)} <span style="color:#64748b;font-size:12px">${safe(u.role)}</span></div><div class="item-meta">${safe(u.email)} · ${safe(u.country)} · ${safe(u.goal)}<br>último login: ${safe(u.last_login)}</div><span class="badge ${isOnline(u)?'online':'offline'}">${isOnline(u)?'ONLINE':'OFFLINE'}</span><span class="badge">${Number(u.active)===1?'ATIVO':'INATIVO'}</span></div>`).join('') : '<div class="item-meta">Nenhum usuário cadastrado.</div>';
+  }
+  function metric(label,value,color){ return `<div class="card"><div class="metric-label">${label}</div><div class="metric-value ${color}">${value}</div></div>`; }
+  loadDashboard();
+</script>
+</body>
+</html>

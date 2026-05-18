@@ -10,6 +10,7 @@ export default function AdminPanel({ onClose }) {
   const [form, setForm] = useState({ username:"", password:"", role:"user", email:"", country:"Brasil", goal:"H-2A" });
   const [pwForm, setPwForm] = useState({ currentPassword:"", newPassword:"" });
   const [aiStatus, setAiStatus] = useState(null);
+  const [activeProvider, setActiveProvider] = useState(() => localStorage.getItem("h2_ai_provider") || "openrouter");
   const [msg, setMsg] = useState(null);
   const [tab, setTab] = useState(isAdmin() ? "users" : "password");
 
@@ -64,6 +65,11 @@ export default function AdminPanel({ onClose }) {
     else flash("❌ " + data.error, false);
   };
 
+  const saveActiveProvider = () => {
+    localStorage.setItem("h2_ai_provider", activeProvider);
+    flash(`✅ Motor ativo definido: ${activeProvider}`);
+  };
+
   const tabBtn = (t, l) => <button onClick={() => setTab(t)} style={{ background:"transparent", border:"none", borderBottom:tab===t?"2px solid #3b82f6":"2px solid transparent", color:tab===t?"#60a5fa":"#475569", padding:"8px 16px", cursor:"pointer", fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:12, marginBottom:-1 }}>{l}</button>;
 
   return (
@@ -106,8 +112,59 @@ export default function AdminPanel({ onClose }) {
           </div></form>}
 
           {tab === "ai" && isAdmin() && <div>
-            <div style={{ color:"#94a3b8", fontSize:13, lineHeight:1.6, marginBottom:14 }}>A tela principal mostra apenas se a IA está online, offline ou não configurada. A escolha e diagnóstico dos providers ficam restritos ao Admin.</div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10, marginBottom:14 }}>{Object.entries(aiStatus?.providers || {}).map(([key, p]) => <div key={key} style={{ background:"#0f172a", border:"1px solid #1e293b", borderRadius:8, padding:12 }}><div style={{ color:"#f1f5f9", fontWeight:700 }}>{p.label}</div><div style={{ marginTop:8 }}><Badge color={(p.online || p.status === "online") ? "#4ade80" : "#fbbf24"}>{(p.online || p.status === "online") ? "ONLINE" : "NÃO CONFIGURADO"}</Badge></div></div>)}</div>
+            <div style={{ color:"#94a3b8", fontSize:13, lineHeight:1.6, marginBottom:14 }}>
+              Escolha abaixo qual motor de IA será usado na varredura. A tela principal continua mostrando apenas o status geral para o usuário comum.
+            </div>
+
+            <div style={{ background:"#0f172a", border:"1px solid #1e293b", borderRadius:8, padding:14, marginBottom:14 }}>
+              <label style={{ display:"block", color:"#64748b", fontSize:11, textTransform:"uppercase", letterSpacing:1, marginBottom:6 }}>
+                Motor ativo da varredura
+              </label>
+
+              <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:10 }}>
+                <select
+                  value={activeProvider}
+                  onChange={e => setActiveProvider(e.target.value)}
+                  style={inp}
+                >
+                  {Object.entries(aiStatus?.providers || {}).map(([key, p]) => (
+                    <option key={key} value={key} disabled={!(p.configured || p.online || p.status === "online")}>
+                      {p.label} — {(p.online || p.status === "online") ? "online" : p.configured ? "configurado" : "não configurado"}
+                    </option>
+                  ))}
+                </select>
+
+                <button onClick={saveActiveProvider} style={btn("#16a34a")}>
+                  ✅ Usar este motor
+                </button>
+              </div>
+
+              <div style={{ color:"#334155", fontSize:11, marginTop:8 }}>
+                Motor salvo atualmente: <strong style={{ color:"#60a5fa" }}>{localStorage.getItem("h2_ai_provider") || "openrouter"}</strong>
+              </div>
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10, marginBottom:14 }}>
+              {Object.entries(aiStatus?.providers || {}).map(([key, p]) => (
+                <div key={key} style={{
+                  background: key === activeProvider ? "#0b2a1a" : "#0f172a",
+                  border: key === activeProvider ? "1px solid #16a34a" : "1px solid #1e293b",
+                  borderRadius:8,
+                  padding:12
+                }}>
+                  <div style={{ color:"#f1f5f9", fontWeight:700, display:"flex", justifyContent:"space-between", gap:8 }}>
+                    <span>{p.label}</span>
+                    {key === activeProvider && <span style={{ color:"#4ade80", fontSize:11 }}>ATIVO</span>}
+                  </div>
+                  <div style={{ marginTop:8 }}>
+                    <Badge color={(p.online || p.status === "online") ? "#4ade80" : p.configured ? "#fbbf24" : "#f87171"}>
+                      {(p.online || p.status === "online") ? "ONLINE" : p.configured ? "CONFIGURADO" : "NÃO CONFIGURADO"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <button onClick={testAi} style={btn("#1d4ed8")}>🔄 Testar conexões</button>
             <div style={{ color:"#334155", fontSize:11, marginTop:10 }}>Última checagem: {aiStatus?.checkedAt || "—"}</div>
           </div>}

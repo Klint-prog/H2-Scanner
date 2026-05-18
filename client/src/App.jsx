@@ -178,8 +178,16 @@ export default function App() {
     if (res.ok) {
       const data = await res.json();
       setAiStatus(data);
-      const first = Object.entries(data.providers || {}).find(([key, value]) => value.configured && PROVIDERS[key]);
-      if (first) { setProvider(first[0]); setModel(PROVIDERS[first[0]].models[0].id); }
+      const preferred = localStorage.getItem("h2_ai_provider");
+      const providers = data.providers || {};
+      const selected =
+        preferred && providers[preferred]?.configured && PROVIDERS[preferred]
+          ? [preferred, providers[preferred]]
+          : Object.entries(providers).find(([key, value]) => value.configured && PROVIDERS[key]);
+      if (selected) {
+        setProvider(selected[0]);
+        setModel(PROVIDERS[selected[0]].models[0].id);
+      }
     }
   }
 
@@ -188,7 +196,7 @@ export default function App() {
   const scan = async () => {
     setLoading(true); setJobs([]); setLogs([]); setSummary(null); setError(null);
     addLog(`🚀 ${visaType} — ${category.label} | ${state} | ${CURRENT_YEAR}`);
-    addLog(`🤖 IA: ${aiStatus?.configured ? prov.short : "não configurada"}`);
+    addLog(`🤖 IA selecionada: ${aiStatus?.configured ? prov.short : "não configurada"}`);
     try {
       if (!aiStatus?.configured) throw new Error("Nenhum motor de IA configurado no servidor. Configure uma chave no .env ou no ambiente.");
       const raw = await callAPI(provider, model, buildPrompt(visaType, category, state, extra));

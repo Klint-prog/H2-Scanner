@@ -107,9 +107,9 @@ function AiStatus({ status, p }) {
   return <div style={{ display: "flex", alignItems: "center", gap: 8, background: p.soft, border: `1px solid ${p.border}`, color: online ? "#22c55e" : "#f59e0b", padding: "6px 10px", borderRadius: 8, fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: online ? "#22c55e" : "#f59e0b" }} />{label}</div>;
 }
 
-function JobCard({ job, idx, vt, p, visaType, meta }) {
+function JobCard({ job, idx, vt, p, visaType, meta, isFavorite, onToggleFavorite }) {
   const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const saved = isFavorite ? isFavorite(job) : false;
   const [check, setCheck] = useState(false);
   const score = job.matchScore || calcMatch(job);
   const [dolLabel, dolColor] = DOL[job.dolStatus] || DOL.NOT_FOUND;
@@ -124,7 +124,7 @@ function JobCard({ job, idx, vt, p, visaType, meta }) {
           <div style={{ color: p.muted, fontSize: 11 }}>📅 {job.period}{job.housing && job.housing !== "N/A" ? ` · 🏠 ${job.housing}` : ""}</div>
         </div>
         <div onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <AppButton onClick={() => setSaved(!saved)} style={{ background: saved ? "#16a34a" : p.soft, color: saved ? "#fff" : p.sub, border: `1px solid ${saved ? "#16a34a" : p.border}` }}>{saved ? "★ Salva" : "☆ Salvar"}</AppButton>
+          <AppButton onClick={() => onToggleFavorite && onToggleFavorite(job)} style={{ background: saved ? "#16a34a" : p.soft, color: saved ? "#fff" : p.sub, border: `1px solid ${saved ? "#16a34a" : p.border}` }}>{saved ? "★ Salva" : "☆ Salvar"}</AppButton>
           <AppButton onClick={() => alert(`Aderência estimada: ${score}%\n\nMotivos: tipo de vaga, DOL, moradia, risco e aderência ao perfil agrícola/TI.`)} style={{ background: p.soft, color: p.sub, border: `1px solid ${p.border}` }}>🎯 Perfil</AppButton>
           <AppButton onClick={() => setCheck(!check)} style={{ background: p.soft, color: p.sub, border: `1px solid ${p.border}` }}>✅ Checklist</AppButton>
           <AppButton onClick={() => generatePDF(job, visaType, meta)} style={{ background: "#1d4ed8", color: "#fff" }}>📄 PDF</AppButton>
@@ -163,6 +163,10 @@ export default function App() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("results");
   const [history, setHistory] = useState([]);
+  const [favorites, setFavorites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("h2_favorites") || "[]"); }
+    catch { return []; }
+  });
 
   useEffect(() => { localStorage.setItem("h2-theme", theme); document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => { if (!getToken()) setAuthUser(null); }, []);
@@ -192,6 +196,20 @@ export default function App() {
   }
 
   if (!authUser) return <Login onLogin={u => setAuthUser(u)} />;
+
+  const favoriteKey = job => `${job.company || ""}|${job.position || ""}|${job.location || ""}|${job.period || ""}`;
+
+  const isFavorite = job => favorites.some(f => favoriteKey(f) === favoriteKey(job));
+
+  const toggleFavorite = job => {
+    setFavorites(prev => {
+      const key = favoriteKey(job);
+      const exists = prev.some(f => favoriteKey(f) === key);
+      const next = exists ? prev.filter(f => favoriteKey(f) !== key) : [{ ...job, savedAt: new Date().toISOString() }, ...prev];
+      localStorage.setItem("h2_favorites", JSON.stringify(next));
+      return next;
+    });
+  };
 
   const scan = async () => {
     setLoading(true); setJobs([]); setLogs([]); setSummary(null); setError(null);
@@ -256,8 +274,16 @@ export default function App() {
         </aside>
         <main style={{ flex: 1, padding: "20px 24px", overflowY: "auto", background: p.bg }}>
           {jobs.length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px,1fr))", gap: 10, marginBottom: 18 }}>{[["Total", jobs.length, vt.color, "📋"], ["Verificadas", jobs.filter(j => j.dolStatus === "VERIFIED").length, "#22c55e", "✅"], ["Pendentes", jobs.filter(j => j.dolStatus === "PENDING").length, "#f59e0b", "⏳"], ["Não encontradas", jobs.filter(j => j.dolStatus === "NOT_FOUND").length, "#ef4444", "❌"], ["Risco baixo", jobs.filter(j => j.risk === "LOW").length, "#8b5cf6", "🟢"]].map(([l, v, c, i]) => <div key={l} style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 14, textAlign: "center", boxShadow: p.shadow }}><div>{i}</div><div style={{ color: c, fontSize: 24, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{v}</div><div style={{ color: p.muted, fontSize: 9, textTransform: "uppercase" }}>{l}</div></div>)}</div>}
-          {(jobs.length > 0 || logs.length > 0) && <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${p.border}`, marginBottom: 16 }}>{[["results", `📋 Resultados (${jobs.length})`], ["terminal", "⚡ Terminal"], ["history", "🕘 Histórico"]].map(([t, l]) => <button key={t} onClick={() => setTab(t)} style={{ background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${vt.color}` : "2px solid transparent", color: tab === t ? vt.color : p.muted, padding: "9px 14px", cursor: "pointer", fontWeight: 800 }}>{l}</button>)}</div>}
-          {tab === "results" && <>{summary && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#bbf7d0", borderRadius: 10, padding: 16, marginBottom: 16 }}><strong style={{ color: "#4ade80" }}>💡 Recomendação Estratégica</strong>{summary.bestPick && <div style={{ marginTop: 6 }}>🏆 {summary.bestPick}</div>}<div style={{ marginTop: 5 }}>{summary.recommendation}</div></div>}{jobs.length > 0 ? jobs.map((j, i) => <JobCard key={i} job={j} idx={i} vt={vt} p={p} visaType={visaType} meta={meta} />) : !loading && <Empty vt={vt} p={p} />}</>}
+          {(jobs.length > 0 || logs.length > 0) && <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${p.border}`, marginBottom: 16 }}>{[["results", `📋 Resultados (${jobs.length})`], ["favorites", `⭐ Favoritos (${favorites.length})`], ["terminal", "⚡ Terminal"], ["history", "🕘 Histórico"]].map(([t, l]) => <button key={t} onClick={() => setTab(t)} style={{ background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${vt.color}` : "2px solid transparent", color: tab === t ? vt.color : p.muted, padding: "9px 14px", cursor: "pointer", fontWeight: 800 }}>{l}</button>)}</div>}
+          {tab === "results" && <>{summary && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#bbf7d0", borderRadius: 10, padding: 16, marginBottom: 16 }}><strong style={{ color: "#4ade80" }}>💡 Recomendação Estratégica</strong>{summary.bestPick && <div style={{ marginTop: 6 }}>🏆 {summary.bestPick}</div>}<div style={{ marginTop: 5 }}>{summary.recommendation}</div></div>}{jobs.length > 0 ? jobs.map((j, i) => <JobCard key={i} job={j} idx={i} vt={vt} p={p} visaType={visaType} meta={meta} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />) : !loading && <Empty vt={vt} p={p} />}</>}
+          {tab === "favorites" && <div>
+            {favorites.length ? favorites.map((j, i) => (
+              <JobCard key={favoriteKey(j)} job={j} idx={i} vt={vt} p={p} visaType={visaType} meta={meta} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
+            )) : <div style={{ color: p.muted, background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 20 }}>
+              Nenhuma vaga salva ainda. Clique em <strong>☆ Salvar</strong> em qualquer vaga para adicioná-la aqui.
+            </div>}
+          </div>}
+
           {tab === "terminal" && <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 16, color: p.sub, fontFamily: "'JetBrains Mono',monospace", minHeight: 120 }}>{logs.length ? logs.map((l, i) => <div key={i}><span style={{ color: p.muted }}>{String(i + 1).padStart(3, "0")}</span> {l}</div>) : "$ aguardando varredura..."}</div>}
           {tab === "history" && <div>{history.length ? history.map(h => <div key={h.id} style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 9, padding: 12, marginBottom: 8, color: p.sub }}>{h.visaType} · {h.category} · {h.state} · {h.jobs} vagas · {h.ts}</div>) : <div style={{ color: p.muted }}>Nenhuma busca ainda.</div>}</div>}
           {!loading && jobs.length === 0 && logs.length === 0 && <Empty vt={vt} p={p} />}

@@ -8,6 +8,7 @@ export default function AdminPanel({ onClose }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ username:"", password:"", role:"user", email:"", country:"Brasil", goal:"H-2A" });
+  const [editUser, setEditUser] = useState(null);
   const [pwForm, setPwForm] = useState({ currentPassword:"", newPassword:"" });
   const [aiStatus, setAiStatus] = useState(null);
   const [activeProvider, setActiveProvider] = useState(() => localStorage.getItem("h2_ai_provider") || "openrouter");
@@ -37,6 +38,26 @@ export default function AdminPanel({ onClose }) {
     const data = await res.json();
     if (res.ok) { flash("✅ Usuário criado!"); setForm({ username:"", password:"", role:"user", email:"", country:"Brasil", goal:"H-2A" }); loadUsers(); }
     else flash("❌ " + data.error, false);
+  };
+
+  const startEdit = (u) => setEditUser({ ...u, password:"" });
+
+  const saveEditUser = async (e) => {
+    e.preventDefault();
+    if (!editUser) return;
+    const payload = {
+      username: editUser.username,
+      email: editUser.email || "",
+      country: editUser.country || "",
+      goal: editUser.goal || "",
+      role: editUser.role,
+      active: Number(editUser.active) === 1 ? 1 : 0,
+      ...(editUser.password ? { password: editUser.password } : {})
+    };
+    const res = await apiFetch(`/api/admin/users/${editUser.id}`, { method:"PUT", body:payload });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) { flash("✅ Usuário atualizado!"); setEditUser(null); loadUsers(); }
+    else flash("❌ " + (data.error || "Erro ao atualizar usuário"), false);
   };
 
   const toggleActive = async (u) => {
@@ -74,7 +95,7 @@ export default function AdminPanel({ onClose }) {
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.8)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:16 }}>
-      <div style={{ background:"#0a0a0f", border:"1px solid #1e293b", borderRadius:12, width:"100%", maxWidth:820, maxHeight:"90vh", display:"flex", flexDirection:"column", overflow:"hidden", fontFamily:"'DM Sans',sans-serif" }}>
+      <div style={{ background:"#0a0a0f", border:"1px solid #1e293b", borderRadius:12, width:"100%", maxWidth:860, maxHeight:"90vh", display:"flex", flexDirection:"column", overflow:"hidden", fontFamily:"'DM Sans',sans-serif" }}>
         <div style={{ padding:"16px 20px", borderBottom:"1px solid #0f172a", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:16, color:"#f1f5f9" }}>⚙️ Painel Administrativo</div>
           <button onClick={onClose} style={{ background:"transparent", border:"1px solid #1e293b", color:"#64748b", width:32, height:32, borderRadius:6, cursor:"pointer", fontSize:16 }}>✕</button>
@@ -97,7 +118,11 @@ export default function AdminPanel({ onClose }) {
               <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}><span style={{ color:"#f1f5f9", fontWeight:600 }}>{u.username}</span><Badge color={u.role==="admin"?"#c4b5fd":"#94a3b8"}>{u.role.toUpperCase()}</Badge><Badge color={u.active?"#4ade80":"#f87171"}>{u.active?"ATIVO":"INATIVO"}</Badge></div>
               <div style={{ color:"#334155", fontSize:11, marginTop:3 }}>{u.email || "sem e-mail"} · {u.country || "—"} · {u.goal || "—"} · Último acesso: {u.last_login?.slice(0,16) || "Nunca"}</div>
             </div>
-            <div style={{ display:"flex", gap:6 }}><button onClick={() => toggleActive(u)} style={{ ...btn(u.active?"#1c1917":"#052e16", u.active?"#fbbf24":"#4ade80"), padding:"5px 10px", fontSize:11, border:`1px solid ${u.active?"#a16207":"#16a34a"}` }}>{u.active?"Desativar":"Ativar"}</button><button onClick={() => deleteUser(u)} style={{ ...btn("#1c0a0a", "#f87171"), padding:"5px 10px", fontSize:11, border:"1px solid #991b1b" }}>Deletar</button></div>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap", justifyContent:"flex-end" }}>
+              <button onClick={() => startEdit(u)} style={{ ...btn("#0f172a", "#93c5fd"), padding:"5px 10px", fontSize:11, border:"1px solid #1d4ed8" }}>Editar</button>
+              <button onClick={() => toggleActive(u)} style={{ ...btn(u.active?"#1c1917":"#052e16", u.active?"#fbbf24":"#4ade80"), padding:"5px 10px", fontSize:11, border:`1px solid ${u.active?"#a16207":"#16a34a"}` }}>{u.active?"Desativar":"Ativar"}</button>
+              <button onClick={() => deleteUser(u)} style={{ ...btn("#1c0a0a", "#f87171"), padding:"5px 10px", fontSize:11, border:"1px solid #991b1b" }}>Deletar</button>
+            </div>
           </div>)}</div>}
 
           {tab === "create" && isAdmin() && <form onSubmit={createUser}><div style={{ display:"grid", gap:14 }}>
@@ -113,85 +138,54 @@ export default function AdminPanel({ onClose }) {
           </div></form>}
 
           {tab === "ai" && isAdmin() && <div>
-            <div style={{ color:"#94a3b8", fontSize:13, lineHeight:1.6, marginBottom:14 }}>
-              Escolha abaixo qual motor de IA será usado na varredura. A tela principal continua mostrando apenas o status geral para o usuário comum.
-            </div>
-
+            <div style={{ color:"#94a3b8", fontSize:13, lineHeight:1.6, marginBottom:14 }}>Escolha abaixo qual motor de IA será usado na varredura. A tela principal continua mostrando apenas o status geral para o usuário comum.</div>
             <div style={{ background:"#0f172a", border:"1px solid #1e293b", borderRadius:8, padding:14, marginBottom:14 }}>
-              <label style={{ display:"block", color:"#64748b", fontSize:11, textTransform:"uppercase", letterSpacing:1, marginBottom:6 }}>
-                Motor ativo da varredura
-              </label>
-
+              <label style={{ display:"block", color:"#64748b", fontSize:11, textTransform:"uppercase", letterSpacing:1, marginBottom:6 }}>Motor ativo da varredura</label>
               <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:10 }}>
-                <select
-                  value={activeProvider}
-                  onChange={e => setActiveProvider(e.target.value)}
-                  style={inp}
-                >
-                  {Object.entries(aiStatus?.providers || {}).map(([key, p]) => (
-                    <option key={key} value={key} disabled={!(p.configured || p.online || p.status === "online")}>
-                      {p.label} — {(p.online || p.status === "online") ? "online" : p.configured ? "configurado" : "não configurado"}
-                    </option>
-                  ))}
-                </select>
-
-                <button onClick={saveActiveProvider} style={btn("#16a34a")}>
-                  ✅ Usar este motor
-                </button>
+                <select value={activeProvider} onChange={e => setActiveProvider(e.target.value)} style={inp}>{Object.entries(aiStatus?.providers || {}).map(([key, p]) => <option key={key} value={key} disabled={!(p.configured || p.online || p.status === "online")}>{p.label} — {(p.online || p.status === "online") ? "online" : p.configured ? "configurado" : "não configurado"}</option>)}</select>
+                <button onClick={saveActiveProvider} style={btn("#16a34a")}>✅ Usar este motor</button>
               </div>
-
-              <div style={{ color:"#334155", fontSize:11, marginTop:8 }}>
-                Motor salvo atualmente: <strong style={{ color:"#60a5fa" }}>{localStorage.getItem("h2_ai_provider") || "openrouter"}</strong>
-              </div>
+              <div style={{ color:"#334155", fontSize:11, marginTop:8 }}>Motor salvo atualmente: <strong style={{ color:"#60a5fa" }}>{localStorage.getItem("h2_ai_provider") || "openrouter"}</strong></div>
             </div>
-
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10, marginBottom:14 }}>
-              {Object.entries(aiStatus?.providers || {}).map(([key, p]) => (
-                <div key={key} style={{
-                  background: key === activeProvider ? "#0b2a1a" : "#0f172a",
-                  border: key === activeProvider ? "1px solid #16a34a" : "1px solid #1e293b",
-                  borderRadius:8,
-                  padding:12
-                }}>
-                  <div style={{ color:"#f1f5f9", fontWeight:700, display:"flex", justifyContent:"space-between", gap:8 }}>
-                    <span>{p.label}</span>
-                    {key === activeProvider && <span style={{ color:"#4ade80", fontSize:11 }}>ATIVO</span>}
-                  </div>
-                  <div style={{ marginTop:8 }}>
-                    <Badge color={(p.online || p.status === "online") ? "#4ade80" : p.configured ? "#fbbf24" : "#f87171"}>
-                      {(p.online || p.status === "online") ? "ONLINE" : p.configured ? "CONFIGURADO" : "NÃO CONFIGURADO"}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10, marginBottom:14 }}>{Object.entries(aiStatus?.providers || {}).map(([key, p]) => <div key={key} style={{ background: key === activeProvider ? "#0b2a1a" : "#0f172a", border: key === activeProvider ? "1px solid #16a34a" : "1px solid #1e293b", borderRadius:8, padding:12 }}><div style={{ color:"#f1f5f9", fontWeight:700, display:"flex", justifyContent:"space-between", gap:8 }}><span>{p.label}</span>{key === activeProvider && <span style={{ color:"#4ade80", fontSize:11 }}>ATIVO</span>}</div><div style={{ marginTop:8 }}><Badge color={(p.online || p.status === "online") ? "#4ade80" : p.configured ? "#fbbf24" : "#f87171"}>{(p.online || p.status === "online") ? "ONLINE" : p.configured ? "CONFIGURADO" : "NÃO CONFIGURADO"}</Badge></div></div>)}</div>
             <button onClick={testAi} style={btn("#1d4ed8")}>🔄 Testar conexões</button>
             <div style={{ color:"#334155", fontSize:11, marginTop:10 }}>Última checagem: {aiStatus?.checkedAt || "—"}</div>
           </div>}
 
           {tab === "smtp" && isAdmin() && <div>
-            <div style={{ color:"#94a3b8", fontSize:13, lineHeight:1.6, marginBottom:14 }}>
-              Configure o servidor SMTP usado para enviar mensagens às empresas a partir das vagas favoritas. As credenciais ficam no backend e não são expostas ao usuário comum.
-            </div>
+            <div style={{ color:"#94a3b8", fontSize:13, lineHeight:1.6, marginBottom:14 }}>Configure o servidor SMTP usado para enviar mensagens às empresas a partir das vagas favoritas. As credenciais ficam no backend e não são expostas ao usuário comum.</div>
             <div style={{ background:"#0f172a", border:"1px solid #1e293b", borderRadius:8, padding:16, marginBottom:14 }}>
               <div style={{ color:"#f1f5f9", fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, marginBottom:6 }}>📧 Configuração de envio SMTP</div>
-              <div style={{ color:"#64748b", fontSize:12, lineHeight:1.6, marginBottom:14 }}>
-                Use esta área para cadastrar host, porta, usuário, senha/app password, remetente e testar envio. Após configurar, os favoritos poderão usar o envio de apresentação do candidato para a empresa.
-              </div>
-              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-                <button onClick={() => { window.location.href = "/smtp-admin.html"; }} style={btn("#16a34a")}>⚙️ Abrir configuração SMTP</button>
-                <button onClick={() => { window.open("/smtp-admin.html", "_blank", "noopener,noreferrer"); }} style={{ ...btn("#0f172a", "#93c5fd"), border:"1px solid #1d4ed8" }}>↗ Abrir em nova aba</button>
-              </div>
+              <div style={{ color:"#64748b", fontSize:12, lineHeight:1.6, marginBottom:14 }}>Use esta área para cadastrar host, porta, usuário, senha/app password, remetente e testar envio. Após configurar, os favoritos poderão usar o envio de apresentação do candidato para a empresa.</div>
+              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}><button onClick={() => { window.location.href = "/smtp-admin.html"; }} style={btn("#16a34a")}>⚙️ Abrir configuração SMTP</button><button onClick={() => { window.open("/smtp-admin.html", "_blank", "noopener,noreferrer"); }} style={{ ...btn("#0f172a", "#93c5fd"), border:"1px solid #1d4ed8" }}>↗ Abrir em nova aba</button></div>
             </div>
-            <div style={{ background:"#1c1917", border:"1px solid #a16207", color:"#fbbf24", padding:12, borderRadius:8, fontSize:12, lineHeight:1.6 }}>
-              Recomendo usar senha de aplicativo do Gmail/Outlook, não a senha principal da conta. Nunca versionar credenciais no GitHub.
-            </div>
+            <div style={{ background:"#1c1917", border:"1px solid #a16207", color:"#fbbf24", padding:12, borderRadius:8, fontSize:12, lineHeight:1.6 }}>Recomendo usar senha de aplicativo do Gmail/Outlook, não a senha principal da conta. Nunca versionar credenciais no GitHub.</div>
           </div>}
 
           {tab === "password" && <form onSubmit={changePw}><div style={{ display:"grid", gap:14 }}><Input label="Senha Atual"><input type="password" value={pwForm.currentPassword} onChange={e => setPwForm({ ...pwForm, currentPassword:e.target.value })} placeholder="••••••••" required style={inp}/></Input><Input label="Nova Senha"><input type="password" value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword:e.target.value })} placeholder="••••••••" required minLength={6} style={inp}/></Input><button type="submit" style={{ ...btn("#16a34a"), padding:"10px" }}>🔑 Alterar Senha</button></div></form>}
         </div>
       </div>
+
+      {editUser && <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.72)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1001, padding:16 }}>
+        <form onSubmit={saveEditUser} style={{ background:"#0a0a0f", border:"1px solid #1e293b", borderRadius:12, width:"100%", maxWidth:620, padding:18, boxShadow:"0 22px 80px rgba(0,0,0,.45)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+            <div style={{ color:"#f1f5f9", fontFamily:"'Syne',sans-serif", fontWeight:800 }}>✏️ Editar usuário</div>
+            <button type="button" onClick={() => setEditUser(null)} style={{ background:"transparent", border:"1px solid #1e293b", color:"#64748b", width:30, height:30, borderRadius:6, cursor:"pointer" }}>✕</button>
+          </div>
+          <div style={{ display:"grid", gap:12 }}>
+            <Input label="Usuário"><input value={editUser.username || ""} onChange={e => setEditUser({ ...editUser, username:e.target.value })} required style={inp}/></Input>
+            <Input label="E-mail"><input type="email" value={editUser.email || ""} onChange={e => setEditUser({ ...editUser, email:e.target.value })} style={inp}/></Input>
+            <Input label="Nova senha"><input type="password" value={editUser.password || ""} onChange={e => setEditUser({ ...editUser, password:e.target.value })} placeholder="Deixe vazio para manter a senha atual" minLength={6} style={inp}/></Input>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+              <Input label="País"><input value={editUser.country || ""} onChange={e => setEditUser({ ...editUser, country:e.target.value })} style={inp}/></Input>
+              <Input label="Objetivo"><select value={editUser.goal || "H-2A"} onChange={e => setEditUser({ ...editUser, goal:e.target.value })} style={inp}><option>H-2A</option><option>H-2B</option><option>TI</option><option>Bioinformática</option><option>AgTech</option><option>Outro</option></select></Input>
+              <Input label="Nível"><select value={editUser.role || "user"} onChange={e => setEditUser({ ...editUser, role:e.target.value })} style={inp}><option value="user">Usuário</option><option value="admin">Admin</option></select></Input>
+            </div>
+            <Input label="Status"><select value={Number(editUser.active) === 1 ? "1" : "0"} onChange={e => setEditUser({ ...editUser, active:Number(e.target.value) })} style={inp}><option value="1">Ativo</option><option value="0">Inativo</option></select></Input>
+            <div style={{ display:"flex", gap:8, justifyContent:"flex-end", flexWrap:"wrap", marginTop:4 }}><button type="button" onClick={() => setEditUser(null)} style={btn("#1c1917", "#fbbf24")}>Cancelar</button><button type="submit" style={btn("#16a34a")}>💾 Salvar alterações</button></div>
+          </div>
+        </form>
+      </div>}
     </div>
   );
 }

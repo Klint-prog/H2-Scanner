@@ -22,50 +22,50 @@
       })();
     </script>
     <script>
-  (function () {
-    var SCOPED_KEYS = [
-      'h2_favorites',
-      'h2_scan_history',
-      'h2_last_jobs',
-      'h2_last_summary'
-    ];
+      (function () {
+        var SCOPED_KEYS = [
+          'h2_favorites',
+          'h2_scan_history',
+          'h2_last_jobs',
+          'h2_last_summary'
+        ];
 
-    var rawGet = Storage.prototype.getItem;
-    var rawSet = Storage.prototype.setItem;
-    var rawRemove = Storage.prototype.removeItem;
+        var rawGet = Storage.prototype.getItem;
+        var rawSet = Storage.prototype.setItem;
+        var rawRemove = Storage.prototype.removeItem;
 
-    function parseJwt(token) {
-      try {
-        return JSON.parse(atob(String(token || '').split('.')[1] || ''));
-      } catch (_) {
-        return null;
-      }
-    }
+        function parseJwt(token) {
+          try {
+            return JSON.parse(atob(String(token || '').split('.')[1] || ''));
+          } catch (_) {
+            return null;
+          }
+        }
 
-    function scopedKey(key) {
-      if (SCOPED_KEYS.indexOf(key) === -1) return key;
+        function scopedKey(key) {
+          if (SCOPED_KEYS.indexOf(key) === -1) return key;
 
-      var token = rawGet.call(localStorage, 'h2_token');
-      var user = parseJwt(token);
+          var token = rawGet.call(localStorage, 'h2_token');
+          var user = parseJwt(token);
 
-      if (!user) return key + ':guest';
+          if (!user) return key + ':guest';
 
-      return key + ':user_' + (user.id || user.username || 'unknown');
-    }
+          return key + ':user_' + (user.id || user.username || 'unknown');
+        }
 
-    Storage.prototype.getItem = function (key) {
-      return rawGet.call(this, scopedKey(key));
-    };
+        Storage.prototype.getItem = function (key) {
+          return rawGet.call(this, scopedKey(key));
+        };
 
-    Storage.prototype.setItem = function (key, value) {
-      return rawSet.call(this, scopedKey(key), value);
-    };
+        Storage.prototype.setItem = function (key, value) {
+          return rawSet.call(this, scopedKey(key), value);
+        };
 
-    Storage.prototype.removeItem = function (key) {
-      return rawRemove.call(this, scopedKey(key));
-    };
-  })();
-</script>
+        Storage.prototype.removeItem = function (key) {
+          return rawRemove.call(this, scopedKey(key));
+        };
+      })();
+    </script>
     <style>
       :root,
       html[data-preload-theme="dark"] {
@@ -196,21 +196,33 @@
           }
         }
 
+        function hideRedundantAccountButton(user) {
+          var buttons = Array.from(document.querySelectorAll('button'));
+          buttons.forEach(function (button) {
+            var label = (button.textContent || '').trim();
+            if (label.indexOf('Minha Conta') !== -1) {
+              button.style.display = user && user.role === 'admin' ? 'none' : '';
+            }
+          });
+        }
+
         function updateDashboardShortcuts() {
           var box = document.getElementById('dashboard-shortcuts');
-          if (!box) return;
-
           var token = localStorage.getItem('h2_token');
           var user = token ? parseJwt(token) : null;
 
-          box.classList.toggle('is-visible', Boolean(user));
-          box.classList.toggle('is-admin', user && user.role === 'admin');
+          if (box) {
+            box.classList.toggle('is-visible', Boolean(user));
+            box.classList.toggle('is-admin', user && user.role === 'admin');
+          }
+
+          hideRedundantAccountButton(user);
         }
 
         updateDashboardShortcuts();
         window.addEventListener('storage', updateDashboardShortcuts);
         window.addEventListener('focus', updateDashboardShortcuts);
-        setInterval(updateDashboardShortcuts, 1500);
+        setInterval(updateDashboardShortcuts, 500);
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>

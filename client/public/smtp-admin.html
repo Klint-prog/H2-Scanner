@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SMTP — H-2 Visa Scanner Pro</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap');
+    :root{--bg:#020408;--panel:#0a0a0f;--soft:#0f172a;--border:#1e293b;--text:#f1f5f9;--muted:#64748b;--sub:#94a3b8;--green:#22c55e;--blue:#60a5fa;--yellow:#f59e0b;--red:#f87171;--purple:#a78bfa}
+    *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif} body{min-height:100vh;padding:22px}.hidden{display:none!important}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}.brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#16a34a,#7c3aed);font-size:22px}.title{font-family:'Syne',sans-serif;font-weight:800;font-size:22px}.subtitle{font:11px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.8px;margin-top:3px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border);background:var(--soft);color:var(--sub);border-radius:8px;padding:9px 12px;text-decoration:none;cursor:pointer;font-weight:800;font-size:12px}.btn:hover{border-color:var(--blue);color:#fff}.primary{background:#1d4ed8;color:#fff;border:none}.danger{border-color:#7f1d1d;color:var(--red)}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;max-width:860px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field{margin-bottom:14px}.field label{display:block;color:var(--muted);font:11px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}.field input,.field select{width:100%;background:#020408;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font:14px 'DM Sans',system-ui,sans-serif}.field input:focus,.field select:focus{outline:2px solid #3b82f6;outline-offset:1px}.status{padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:var(--soft);color:var(--sub);font-size:13px;line-height:1.5;margin-bottom:14px}.ok{border-color:#166534;color:#bbf7d0;background:#052e16}.err{border-color:#991b1b;color:#fca5a5;background:#1c0a0a}.note{color:var(--muted);font-size:12px;line-height:1.6;margin-top:14px}.row{display:flex;gap:8px;flex-wrap:wrap}@media(max-width:760px){body{padding:14px}.grid{grid-template-columns:1fr}.title{font-size:18px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="logo">📧</div><div><div class="title">Configuração SMTP</div><div class="subtitle">ENVIO DE E-MAILS PARA EMPRESAS FAVORITAS</div></div></div>
+    <div class="actions"><a class="btn" href="/admin-dashboard.html">← Admin Dashboard</a><a class="btn" href="/">Scanner</a><button class="btn danger" onclick="logout()">⏏ Sair</button></div>
+  </header>
+
+  <div id="msg" class="status hidden"></div>
+  <section class="card">
+    <div id="current" class="status">Carregando configuração...</div>
+    <form id="form">
+      <div class="grid">
+        <div class="field"><label>Host SMTP</label><input name="host" placeholder="smtp.office365.com" required></div>
+        <div class="field"><label>Porta</label><input name="port" type="number" value="587" required></div>
+        <div class="field"><label>Segurança</label><select name="secure"><option value="false">STARTTLS / porta 587</option><option value="true">SSL/TLS / porta 465</option></select></div>
+        <div class="field"><label>Usuário SMTP</label><input name="user" placeholder="seu-email@dominio.com" required></div>
+        <div class="field"><label>Senha SMTP / App Password</label><input name="pass" type="password" placeholder="Deixe vazio para manter a senha atual"></div>
+        <div class="field"><label>Remetente</label><input name="from" placeholder="H-2 Visa Scanner Pro <seu-email@dominio.com>" required></div>
+        <div class="field"><label>Reply-To</label><input name="replyTo" placeholder="seu-email@dominio.com"></div>
+        <div class="field"><label>E-mail para teste</label><input name="testTo" placeholder="destino@dominio.com"></div>
+      </div>
+      <div class="row"><button class="btn primary" type="submit">💾 Salvar SMTP</button><button class="btn" type="button" onclick="testSmtp()">📨 Enviar teste</button><button class="btn" type="button" onclick="loadConfig()">🔄 Recarregar</button></div>
+    </form>
+    <div class="note">A senha SMTP fica no servidor, em <code>data/smtp-settings.json</code>, e não é enviada de volta para o navegador. Para produção, recomenda-se criptografar esse arquivo ou migrar para banco com criptografia por chave de ambiente.</div>
+  </section>
+<script>
+  const token = localStorage.getItem('h2_token');
+  const parseJwt = t => { try { return JSON.parse(atob(t.split('.')[1] || '')); } catch { return null; } };
+  const user = parseJwt(token || '');
+  const form = document.getElementById('form');
+  function show(text, ok=true){ const el=document.getElementById('msg'); el.className='status '+(ok?'ok':'err'); el.textContent=text; el.classList.remove('hidden'); }
+  function api(path, options={}){ return fetch(path,{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,...(options.headers||{})}}); }
+  function logout(){ localStorage.removeItem('h2_token'); location.href='/'; }
+  if(!token || !user || user.role !== 'admin'){ show('Acesso restrito ao administrador. Faça login como admin.', false); form.style.display='none'; }
+  async function loadConfig(){
+    if(!token || user.role !== 'admin') return;
+    const res = await api('/api/admin/smtp/config');
+    const data = await res.json();
+    if(!res.ok){ show(data.error || 'Erro ao carregar SMTP', false); return; }
+    document.getElementById('current').className='status '+(data.configured?'ok':'');
+    document.getElementById('current').innerHTML = data.configured ? `✅ SMTP configurado via <b>${data.source || 'servidor'}</b><br>Host: ${data.host}:${data.port} · Usuário: ${data.user} · From: ${data.from}` : '⚠️ SMTP ainda não configurado.';
+    form.host.value = data.host || '';
+    form.port.value = data.port || 587;
+    form.secure.value = String(Boolean(data.secure));
+    form.user.value = data.user && data.user.includes('***') ? '' : (data.user || '');
+    form.from.value = data.from || '';
+    form.replyTo.value = data.replyTo || '';
+  }
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(form).entries());
+    body.port = Number(body.port || 587);
+    body.secure = body.secure === 'true';
+    const res = await api('/api/admin/smtp/config',{method:'POST',body:JSON.stringify(body)});
+    const data = await res.json();
+    if(!res.ok){ show(data.error || 'Erro ao salvar SMTP', false); return; }
+    form.pass.value='';
+    show('✅ Configuração SMTP salva.');
+    loadConfig();
+  });
+  async function testSmtp(){
+    const to = form.testTo.value || form.replyTo.value || form.user.value;
+    const res = await api('/api/admin/smtp/test',{method:'POST',body:JSON.stringify({to})});
+    const data = await res.json();
+    if(!res.ok){ show(data.error || 'Erro ao testar SMTP', false); return; }
+    show('✅ '+(data.message || 'E-mail de teste enviado.'));
+  }
+  loadConfig();
+</script>
+</body>
+</html>

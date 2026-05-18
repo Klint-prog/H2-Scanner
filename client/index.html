@@ -3,10 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#020408" />
+    <meta name="color-scheme" content="dark light" />
     <title>H-2 Visa Scanner Pro</title>
     <meta name="description" content="Varredura inteligente de vagas H-2A e H-2B com validação DOL" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛂</text></svg>" />
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('h2-theme') || 'dark';
+          var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          var resolved = theme === 'system' ? (prefersLight ? 'light' : 'dark') : theme;
+          document.documentElement.setAttribute('data-preload-theme', resolved);
+          document.documentElement.style.background = resolved === 'light' ? '#f8fafc' : '#020408';
+        } catch (_) {
+          document.documentElement.style.background = '#020408';
+        }
+      })();
+    </script>
     <style>
+      :root,
+      html[data-preload-theme="dark"] {
+        color-scheme: dark;
+        background: #020408;
+        --preload-bg: #020408;
+        --preload-panel: #0a0a0f;
+        --preload-border: #1e293b;
+        --preload-text: #f1f5f9;
+        --preload-muted: #64748b;
+      }
+      html[data-preload-theme="light"] {
+        color-scheme: light;
+        background: #f8fafc;
+        --preload-bg: #f8fafc;
+        --preload-panel: #ffffff;
+        --preload-border: #dbe3ef;
+        --preload-text: #0f172a;
+        --preload-muted: #64748b;
+      }
+      html,
+      body,
+      #root {
+        margin: 0;
+        min-width: 100%;
+        min-height: 100%;
+        background: var(--preload-bg, #020408);
+      }
+      body {
+        overflow: hidden;
+        color: var(--preload-text, #f1f5f9);
+      }
+      #root:empty::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(circle at 18px 18px, rgba(30, 41, 59, .45) 1px, transparent 1px),
+          var(--preload-bg, #020408);
+        background-size: 32px 32px, auto;
+        z-index: 0;
+      }
+      #root:empty::after {
+        content: "H-2 Visa Scanner Pro";
+        position: fixed;
+        left: 22px;
+        top: 18px;
+        color: var(--preload-muted, #64748b);
+        font: 700 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: .08em;
+        z-index: 1;
+      }
       .dashboard-shortcuts {
         position: fixed;
         left: 360px;

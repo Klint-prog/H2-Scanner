@@ -1,0 +1,10 @@
+node_modules
+client/node_modules
+client/dist
+.env
+.env.local
+*.log
+.git
+.gitignore
+README.md
+Dockerfile.dev

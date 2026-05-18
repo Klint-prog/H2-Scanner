@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: h2-visa-scanner
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-mude_esta_chave_em_producao}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-8h}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - DB_PATH=/app/data/scanner.db
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    env_file:
+      - .env
+    volumes:
+      - scanner_data:/app/data   # banco SQLite persiste entre restarts
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - scanner-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  scanner_data:
+    driver: local
+
+networks:
+  scanner-net:
+    driver: bridge

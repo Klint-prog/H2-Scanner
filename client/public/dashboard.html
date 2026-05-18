@@ -15,7 +15,7 @@
 </head>
 <body>
   <header>
-    <div class="brand"><div class="logo">📊</div><div><div class="title">Dashboard de Atividades</div><div class="subtitle">FAVORITOS · HISTÓRICO · ÚLTIMOS RESULTADOS LOCAIS</div></div></div>
+    <div class="brand"><div class="logo">📊</div><div><div class="title">Dashboard de Atividades</div><div class="subtitle" id="dashScope">FAVORITOS · HISTÓRICO · ÚLTIMOS RESULTADOS LOCAIS</div></div></div>
     <div class="actions"><a class="btn" href="/">← Voltar ao Scanner</a><button class="btn" onclick="reloadData()">🔄 Atualizar</button><button class="btn danger" onclick="clearLocalData()">🗑 Limpar dados locais</button></div>
   </header>
   <section class="grid">
@@ -28,14 +28,23 @@
     <div class="card"><h2>⭐ Vagas favoritas</h2><div id="favorites"></div><div class="list-actions"><button class="btn" onclick="downloadJson('h2_favorites','favoritos-h2.json')">⬇ Exportar favoritos</button></div></div>
     <div class="card"><h2>🕘 Histórico de varreduras</h2><div id="history"></div><div class="list-actions"><button class="btn" onclick="downloadJson('h2_scan_history','historico-h2.json')">⬇ Exportar histórico</button></div></div>
   </section>
-  <section class="card" style="margin-top:14px"><h2>📋 Últimos resultados salvos localmente</h2><div id="lastJobs"></div><div class="footer">Esta tela lê apenas dados do navegador via localStorage. Ela não consome tokens de IA e não executa nova varredura. Para uma versão SaaS futura, estes dados devem migrar para banco de dados por usuário.</div></section>
+  <section class="card" style="margin-top:14px"><h2>📋 Últimos resultados salvos localmente</h2><div id="lastJobs"></div><div class="footer">Esta tela lê dados locais escopados por usuário. Ela não consome tokens de IA e não executa nova varredura. Para uma versão SaaS futura, estes dados devem migrar para banco de dados por usuário.</div></section>
 <script>
-  const get = (key, fallback=[]) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; } };
+  const scopedKeys = ['h2_favorites','h2_scan_history','h2_last_jobs','h2_last_summary'];
+  function parseJwt(token){ try { return JSON.parse(atob(String(token || '').split('.')[1] || '')); } catch { return null; } }
+  function currentUser(){ return parseJwt(localStorage.getItem('h2_token') || ''); }
+  function scopedKey(key){ const u = currentUser(); return scopedKeys.includes(key) ? `${key}:user_${u?.id || u?.username || 'guest'}` : key; }
+  function get(key, fallback=[]){ try { return JSON.parse(localStorage.getItem(scopedKey(key)) || JSON.stringify(fallback)); } catch { return fallback; } }
+  function setScoped(key, value){ localStorage.setItem(scopedKey(key), JSON.stringify(value)); }
+  function removeScoped(key){ localStorage.removeItem(scopedKey(key)); }
+  function rawGlobalExists(){ return scopedKeys.some(k => localStorage.getItem(k)); }
   const safe = v => String(v || '—');
-  const jobKey = j => `${j.company || ''}|${j.position || ''}|${j.location || ''}|${j.period || ''}`;
   function jobItem(j){ return `<div class="item"><div class="item-title">${safe(j.company)}</div><div class="item-meta">${safe(j.position)} · ${safe(j.location)}<br>${safe(j.wage)} · ${safe(j.period)}</div><span class="badge">${safe(j.dolStatus)}</span><span class="badge">Risco ${safe(j.risk)}</span><span class="badge">Aderência ${safe(j.matchScore)}%</span></div>`; }
   function histItem(h){ return `<div class="item"><div class="item-title">${safe(h.visaType)} · ${safe(h.category)}</div><div class="item-meta">${safe(h.state)} · ${safe(h.jobs)} vagas · ${safe(h.verified)} verificadas<br>${safe(h.provider)} · ${safe(h.ts)}</div></div>`; }
   function reloadData(){
+    const user = currentUser();
+    if (!user) { location.href = '/'; return; }
+    document.getElementById('dashScope').textContent = `DADOS DO USUÁRIO: ${user.username || user.id} · FAVORITOS · HISTÓRICO · ÚLTIMOS RESULTADOS`;
     const fav = get('h2_favorites'); const hist = get('h2_scan_history'); const last = get('h2_last_jobs');
     document.getElementById('favCount').textContent = fav.length;
     document.getElementById('histCount').textContent = hist.length;
@@ -43,10 +52,10 @@
     document.getElementById('lastActivity').textContent = hist[0]?.ts || fav[0]?.savedAt?.slice(0,10) || '—';
     document.getElementById('favorites').innerHTML = fav.length ? fav.map(jobItem).join('') : '<div class="empty">Nenhuma vaga favorita salva ainda.</div>';
     document.getElementById('history').innerHTML = hist.length ? hist.map(histItem).join('') : '<div class="empty">Nenhuma varredura registrada ainda.</div>';
-    document.getElementById('lastJobs').innerHTML = last.length ? last.map(jobItem).join('') : '<div class="empty">Nenhum resultado salvo localmente. Faça uma varredura no scanner para preencher esta seção.</div>';
+    document.getElementById('lastJobs').innerHTML = last.length ? last.map(jobItem).join('') : '<div class="empty">Nenhum resultado salvo localmente para este usuário. Faça uma varredura no scanner para preencher esta seção.</div>';
   }
-  function downloadJson(key, filename){ const data = localStorage.getItem(key) || '[]'; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type:'application/json'})); a.download = filename; a.click(); }
-  function clearLocalData(){ if(!confirm('Limpar favoritos, histórico e últimos resultados locais?')) return; ['h2_favorites','h2_scan_history','h2_last_jobs','h2_last_summary'].forEach(k => localStorage.removeItem(k)); reloadData(); }
+  function downloadJson(key, filename){ const data = localStorage.getItem(scopedKey(key)) || '[]'; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type:'application/json'})); a.download = filename; a.click(); }
+  function clearLocalData(){ if(!confirm('Limpar favoritos, histórico e últimos resultados deste usuário?')) return; scopedKeys.forEach(k => removeScoped(k)); reloadData(); }
   reloadData();
 </script>
 </body>

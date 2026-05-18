@@ -21,6 +21,51 @@
         }
       })();
     </script>
+    <script>
+  (function () {
+    var SCOPED_KEYS = [
+      'h2_favorites',
+      'h2_scan_history',
+      'h2_last_jobs',
+      'h2_last_summary'
+    ];
+
+    var rawGet = Storage.prototype.getItem;
+    var rawSet = Storage.prototype.setItem;
+    var rawRemove = Storage.prototype.removeItem;
+
+    function parseJwt(token) {
+      try {
+        return JSON.parse(atob(String(token || '').split('.')[1] || ''));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function scopedKey(key) {
+      if (SCOPED_KEYS.indexOf(key) === -1) return key;
+
+      var token = rawGet.call(localStorage, 'h2_token');
+      var user = parseJwt(token);
+
+      if (!user) return key + ':guest';
+
+      return key + ':user_' + (user.id || user.username || 'unknown');
+    }
+
+    Storage.prototype.getItem = function (key) {
+      return rawGet.call(this, scopedKey(key));
+    };
+
+    Storage.prototype.setItem = function (key, value) {
+      return rawSet.call(this, scopedKey(key), value);
+    };
+
+    Storage.prototype.removeItem = function (key) {
+      return rawRemove.call(this, scopedKey(key));
+    };
+  })();
+</script>
     <style>
       :root,
       html[data-preload-theme="dark"] {

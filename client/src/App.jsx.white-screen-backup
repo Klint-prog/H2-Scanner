@@ -1,0 +1,454 @@
+import { useCallback, useEffect, useState } from "react";
+import Login from "./Login.jsx";
+import AdminPanel from "./AdminPanel.jsx";
+import { getToken, getUser, clearToken, isAdmin, apiFetch } from "./auth.js";
+
+const CURRENT_YEAR = 2026;
+
+const VISA_TYPES = {
+  H2A: {
+    label: "H-2A", full: "Trabalhadores Agrícolas", color: "#22c55e", accent: "#16a34a", icon: "🌾",
+    categories: [
+      { id: "crops", label: "Colheita / Culturas", query: "crop harvest farm workers H2A agricultural seasonal field labor 2025 2026" },
+      { id: "equipment", label: "Mecanização Agrícola", query: "agricultural equipment operator farm equipment operator tractor operator harvester operator combine operator sprayer operator farm machinery H2A 2025 2026" },
+      { id: "tractor", label: "Tratorista / Operador de Trator", query: "tractor operator farm tractor driver agricultural tractor H2A seasonal 2025 2026" },
+      { id: "harvester", label: "Colheitadeira / Harvester", query: "harvester operator combine operator cotton picker forage harvester agricultural equipment H2A 2025 2026" },
+      { id: "sprayer", label: "Pulverização / Aplicação", query: "sprayer operator pesticide applicator crop spraying agricultural applicator H2A 2025 2026" },
+      { id: "grain", label: "Grãos / Grandes Culturas", query: "corn soybean wheat grain farm row crop farmworker combine operator H2A 2025 2026" },
+      { id: "irrigation", label: "Irrigação / Manejo de Água", query: "irrigation worker irrigation technician irrigation equipment operator farm irrigation H2A 2025 2026" },
+      { id: "livestock", label: "Pecuária / Gado", query: "livestock cattle ranch hand animal farmworker H2A agricultural workers 2025 2026" },
+      { id: "dairy", label: "Laticínios / Dairy Farm", query: "dairy farm worker milking parlor dairy cattle H2A agricultural visa workers 2025 2026" },
+      { id: "ranch", label: "Ranch Hand / Fazenda Mista", query: "ranch hand farm hand general farmworker mixed farm livestock crop H2A 2025 2026" },
+      { id: "orchard", label: "Pomares / Frutas", query: "orchard apple cherry fruit picking pruning thinning H2A farm workers 2025 2026" },
+      { id: "vegetables", label: "Hortaliças / Vegetais", query: "vegetable farm worker field vegetable tomato lettuce pepper produce farm H2A 2025 2026" },
+      { id: "nursery", label: "Viveiros / Flores", query: "nursery greenhouse flowers plants horticulture H2A seasonal 2025 2026" },
+      { id: "greenhouse", label: "Estufas / Greenhouse", query: "greenhouse worker greenhouse technician plant production nursery H2A 2025 2026" },
+      { id: "packing", label: "Packing House / Embalagem", query: "packinghouse worker fruit packer vegetable packer grader sorter agricultural packing H2A 2025 2026" },
+      { id: "tobacco", label: "Tabaco", query: "tobacco farm worker tobacco harvest H2A seasonal agricultural workers 2025 2026" },
+      { id: "sugarcane", label: "Cana / Culturas Tropicais", query: "sugarcane farm worker cane harvest tropical crops H2A agricultural seasonal 2025 2026" },
+      { id: "truck", label: "Caminhão Agrícola", query: "agricultural truck driver farm truck driver heavy tractor trailer farm hauling H2A 2025 2026" },
+      { id: "aqua", label: "Aquicultura", query: "aquaculture fish farm shellfish farm H2A agricultural workers 2025 2026" },
+      { id: "forestry", label: "Silvicultura", query: "forestry reforestation tree planting forest nursery H2A seasonal 2025 2026" },
+      { id: "apiary", label: "Apicultura", query: "beekeeper apiary worker honey farm worker H2A seasonal 2025 2026" },
+      { id: "maintenance", label: "Manutenção Rural", query: "farm maintenance worker equipment maintenance helper fence repair farm building maintenance H2A 2025 2026" },
+    ],
+    dolInfo: "O DOL exige ETA-9142A com alojamento e transporte gratuitos ao trabalhador.",
+    certLabel: "Certificação ETA-9142A",
+  },
+  H2B: {
+    label: "H-2B", full: "Temporários Não-Agrícolas", color: "#3b82f6", accent: "#1d4ed8", icon: "🏨",
+    categories: [
+      { id: "hospitality", label: "Hotelaria / Resorts", query: "hotel resort hospitality worker H2B seasonal 2025 2026" },
+      { id: "housekeeping", label: "Housekeeping / Limpeza", query: "housekeeping room attendant hotel cleaner maid H2B seasonal 2025 2026" },
+      { id: "food", label: "Cozinha / Restaurante", query: "cook line cook prep cook kitchen helper dishwasher food preparation H2B seasonal 2025 2026" },
+      { id: "counter", label: "Atendimento / Counter Worker", query: "counter worker fast food attendant cashier food service H2B seasonal 2025 2026" },
+      { id: "landscaping", label: "Paisagismo / Jardinagem", query: "landscaping grounds maintenance lawn care groundskeeper H2B seasonal 2025 2026" },
+      { id: "golf", label: "Campo de Golfe", query: "golf course maintenance groundskeeper turf maintenance H2B seasonal 2025 2026" },
+      { id: "construction", label: "Construção Sazonal", query: "seasonal construction laborer roofing concrete helper H2B temporary 2025 2026" },
+      { id: "maintenance", label: "Manutenção / Facilities", query: "maintenance worker building maintenance facilities worker repair helper H2B seasonal 2025 2026" },
+      { id: "seafood", label: "Processamento Marinho", query: "seafood processing crab shrimp oyster fish processing H2B seasonal 2025 2026" },
+      { id: "meat", label: "Carnes / Frigorífico", query: "meat processing poultry processing fish cutter food processing worker H2B 2025 2026" },
+      { id: "forestry", label: "Florestal / Conservação", query: "forest worker conservation worker tree planter brush clearer H2B seasonal 2025 2026" },
+      { id: "amusement", label: "Parques & Lazer", query: "amusement park theme park recreation attendant H2B seasonal 2025 2026" },
+      { id: "ski", label: "Resorts de Ski", query: "ski resort mountain resort lift attendant snow removal H2B seasonal workers 2025 2026" },
+      { id: "camp", label: "Acampamentos", query: "summer camp recreation camp counselor camp worker H2B seasonal 2025 2026" },
+      { id: "driver", label: "Motorista / Transporte", query: "shuttle driver bus driver truck driver delivery driver H2B seasonal 2025 2026" },
+      { id: "warehouse", label: "Warehouse / Logística", query: "warehouse worker material handler loader stocker H2B seasonal 2025 2026" },
+      { id: "events", label: "Eventos / Clubes", query: "event staff clubhouse attendant banquet worker club worker H2B seasonal 2025 2026" },
+      { id: "laundry", label: "Lavanderia", query: "laundry worker hotel laundry attendant linen worker H2B seasonal 2025 2026" },
+      { id: "tourism", label: "Turismo / Praia", query: "beach attendant tourism worker resort beach service H2B seasonal 2025 2026" },
+      { id: "pool", label: "Piscinas / Pool Service", query: "pool maintenance pool attendant pool service worker H2B seasonal 2025 2026" },
+      { id: "cleaning", label: "Limpeza Comercial", query: "commercial cleaning janitorial cleaner H2B seasonal 2025 2026" },
+    ],
+    dolInfo: "Para H-2B, o empregador deve obter Certificação DOL (ETA-9142B) antes da petição ao USCIS.",
+    certLabel: "Certificação ETA-9142B",
+  },
+};
+
+const PROVIDERS = {
+  anthropic: { short: "Claude", endpoint: "/api/anthropic", models: [{ id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" }, { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" }] },
+  openrouter: { short: "OpenRouter", endpoint: "/api/openrouter", models: [{ id: "openai/gpt-4o-mini", label: "GPT-4o Mini" }, { id: "openai/gpt-4o", label: "GPT-4o" }, { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" }] },
+  openai: { short: "OpenAI", endpoint: "/api/openai", models: [{ id: "gpt-4o-mini", label: "GPT-4o Mini" }, { id: "gpt-4o", label: "GPT-4o" }] },
+};
+
+const US_STATES = ["All States", "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"];
+const CHECKLIST = ["PDF oficial baixado/verificado", "Vaga confirmada no DOL", "Moradia verificada", "Salário e horas conferidos", "Contato oficial validado", "Recrutador conferido", "Nenhuma taxa paga a recrutador", "Histórico OSHA/DOL revisado"];
+const DOL = { VERIFIED: ["DOL Verificada", "#22c55e"], PENDING: ["Pendente DOL", "#f59e0b"], NOT_FOUND: ["Não Encontrada", "#ef4444"] };
+
+function inferSeasonType(job) {
+  const raw = String(job.seasonType || job.season || job.period || "").toLowerCase();
+
+  if (/winter|inverno|ski|snow|dec|jan|feb|mar|dez|jan|fev|winter season/.test(raw)) {
+    return { label: "Inverno", icon: "❄️", color: "#60a5fa" };
+  }
+
+  if (/summer|verão|verao|may|jun|jul|aug|sep|mai|jun|jul|ago|set|summer season/.test(raw)) {
+    return { label: "Verão", icon: "☀️", color: "#f59e0b" };
+  }
+
+  if (/year|ano todo|all year|full year|permanent|ongoing/.test(raw)) {
+    return { label: "Ano todo", icon: "🌦️", color: "#22c55e" };
+  }
+
+  return { label: "Indefinido", icon: "🗓️", color: "#94a3b8" };
+}
+
+function inferLanguagePreference(job) {
+  const raw = String(
+    job.languagePreference ||
+    job.language ||
+    job.languages ||
+    job.flags ||
+    job.contact ||
+    job.position ||
+    ""
+  ).toLowerCase();
+
+  const hasEnglish = /english|ingl[eê]s|ingles|en\b|speak english|basic english/.test(raw);
+  const hasSpanish = /spanish|espanhol|español|es\b|bilingual|bilingue|bilingüe/.test(raw);
+
+  if (hasEnglish && hasSpanish) {
+    return { label: "Inglês/Espanhol", icon: "🇺🇸🇪🇸", color: "#22c55e" };
+  }
+
+  if (hasSpanish) {
+    return { label: "Espanhol", icon: "🇪🇸", color: "#f59e0b" };
+  }
+
+  if (hasEnglish) {
+    return { label: "Inglês", icon: "🇺🇸", color: "#60a5fa" };
+  }
+
+  if (/portuguese|português|portugues|french|franc[eê]s|creole|haitian|other language/.test(raw)) {
+    return { label: "Outro idioma", icon: "🌐", color: "#a78bfa" };
+  }
+
+  return { label: "Não informado", icon: "💬", color: "#94a3b8" };
+}
+
+function themePalette(mode) {
+  const light = mode === "light" || (mode === "system" && window.matchMedia?.("(prefers-color-scheme: light)")?.matches);
+  return light ? { bg: "#f8fafc", panel: "#ffffff", card: "#ffffff", soft: "#eef2ff", border: "#dbe3ef", text: "#0f172a", sub: "#475569", muted: "#64748b", input: "#ffffff", shadow: "0 16px 34px rgba(15,23,42,.08)" } : { bg: "#020408", panel: "#020408", card: "#0a0a0f", soft: "#0f172a", border: "#1e293b", text: "#f1f5f9", sub: "#94a3b8", muted: "#475569", input: "#0a0a0f", shadow: "none" };
+}
+
+function calcMatch(job) {
+  let score = 55;
+  const text = `${job.company || ""} ${job.position || ""} ${job.flags || ""}`.toLowerCase();
+  if (/tractor|equipment|operator|machinery/.test(text)) score += 20;
+  if (/greenhouse|nursery|farm|crop|harvest|agricultural/.test(text)) score += 15;
+  if (job.dolStatus === "VERIFIED") score += 8;
+  if (job.risk === "LOW") score += 7;
+  if (/yes/i.test(job.housing || "")) score += 5;
+  if (job.risk === "HIGH") score -= 18;
+  return Math.max(25, Math.min(98, score));
+}
+
+async function callAPI(provider, model, prompt) {
+  const ep = PROVIDERS[provider].endpoint;
+  const body = provider === "anthropic"
+    ? { model, max_tokens: 5000, messages: [{ role: "user", content: prompt }] }
+    : {
+        model,
+        max_tokens: 5000,
+        messages: [{ role: "user", content: prompt }],
+        ...(["openai", "openrouter"].includes(provider) ? { response_format: { type: "json_object" } } : {})
+      };
+  const res = await apiFetch(ep, { method: "POST", body });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || err.error || `HTTP ${res.status} — verifique as chaves no .env`);
+  }
+  const data = await res.json();
+  return provider === "anthropic" ? (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n") : data.choices?.[0]?.message?.content || "";
+}
+
+function buildPrompt(visaType, category, state, extra) {
+  return `You are an expert ${visaType} visa job researcher. Today is ${new Date().toISOString().slice(0, 10)} (${CURRENT_YEAR}).\nTASK: Find CURRENT active ${visaType} postings for 2025/2026 season in "${state}" USA.\nCATEGORY: ${category.label} — query: "${category.query}"\nSkip anything from 2024 or older.\nReturn 4-6 employers with company, title, location, openings, wage, period, seasonType, languagePreference, housing, DOL status, cert number, NAICS, contacts, source URL, compliance notes, risk and matchScore. Keep values concise. seasonType MUST be one of: "summer", "winter", "year_round", "unknown". languagePreference MUST be one of: "english", "spanish", "english_spanish", "other", "not_informed". Use job description, contact language, recruiter notes or employer hints to infer language only when reasonable. Use "not_informed" if unclear.\n${extra ? `EXTRA: ${extra}` : ""}\nRespond ONLY valid JSON, no markdown: {"jobs":[{"company":"","position":"","location":"","openings":"","wage":"","period":"Apr 2026 – Nov 2026","seasonType":"summer|winter|year_round|unknown","languagePreference":"english|spanish|english_spanish|other|not_informed","housing":"Yes|No|N/A","dolStatus":"VERIFIED|PENDING|NOT_FOUND","dolCert":"","naicsCode":"","contactName":"","contactEmail":"","contactPhone":"","contactAddress":"","agentName":"","agentEmail":"","contact":"","source":"","flags":"","risk":"LOW|MEDIUM|HIGH","matchScore":80}],"logs":["🔍 Buscando..."],"summary":{"verified":0,"pending":0,"notFound":0,"bestPick":"Empresa — motivo em português","recommendation":"2-3 frases em português"}}`;
+}
+
+function generatePDF(job, visaType, meta) {
+  const safe = value => String(value || "—");
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${safe(job.company)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#172033}.box{border:1px solid #dbe3ef;border-radius:10px;padding:14px;margin:12px 0}.badge{display:inline-block;padding:4px 8px;border-radius:6px;background:#eef2ff;margin-right:6px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media print{button{display:none}}</style></head><body><h1>🛂 H-2 Visa Scanner Pro</h1><p>${visaType} · ${meta.category} · ${meta.state}</p><div class="box"><h2>${safe(job.company)}</h2><p>${safe(job.position)} · ${safe(job.location)}</p><span class="badge">${safe(job.dolStatus)}</span><span class="badge">${inferSeasonType(job).icon} ${inferSeasonType(job).label}</span><span class="badge">${inferLanguagePreference(job).icon} ${inferLanguagePreference(job).label}</span><span class="badge">Risco ${safe(job.risk)}</span><span class="badge">Aderência ${safe(job.matchScore || calcMatch(job))}%</span></div><div class="grid"><div class="box"><b>Vagas</b><br>${safe(job.openings)}</div><div class="box"><b>Salário</b><br>${safe(job.wage)}</div><div class="box"><b>Período</b><br>${safe(job.period)}</div><div class="box"><b>Moradia</b><br>${safe(job.housing)}</div></div><div class="box"><b>Contato</b><br>${safe(job.contactName)} · ${safe(job.contactEmail)} · ${safe(job.contactPhone)}<br>${safe(job.contactAddress)}</div><div class="box"><b>Compliance</b><br>${safe(job.flags)}</div><div class="box"><b>Fonte</b><br>${job.source ? `<a href="${job.source}">${job.source}</a>` : "—"}</div><div class="box"><b>Checklist de segurança</b><ul>${CHECKLIST.map(i => `<li>${i}</li>`).join("")}</ul></div><p>Confirme sempre no DOL/SeasonalJobs. Não constitui aconselhamento jurídico.</p><button onclick="window.print()">Salvar como PDF</button></body></html>`;
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+}
+
+function AppButton({ children, onClick, style, disabled }) {
+  return <button onClick={onClick} disabled={disabled} style={{ border: "none", borderRadius: 8, padding: "8px 11px", cursor: disabled ? "not-allowed" : "pointer", fontWeight: 700, ...style }}>{children}</button>;
+}
+
+function AiStatus({ status, p }) {
+  const configured = Number(status?.configured || 0);
+  const online = configured > 0;
+  const label = configured === 0 ? "IA Não Configurada" : online ? "IA Online" : "IA Offline";
+  return <div style={{ display: "flex", alignItems: "center", gap: 8, background: p.soft, border: `1px solid ${p.border}`, color: online ? "#22c55e" : "#f59e0b", padding: "6px 10px", borderRadius: 8, fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: online ? "#22c55e" : "#f59e0b" }} />{label}</div>;
+}
+
+function JobCard({ job, idx, vt, p, visaType, meta, isFavorite, onToggleFavorite }) {
+  const [open, setOpen] = useState(false);
+  const saved = isFavorite ? isFavorite(job) : false;
+  const [check, setCheck] = useState(false);
+  const score = job.matchScore || calcMatch(job);
+  const season = inferSeasonType(job);
+  const language = inferLanguagePreference(job);
+  const [dolLabel, dolColor] = DOL[job.dolStatus] || DOL.NOT_FOUND;
+  const riskColor = job.risk === "LOW" ? "#22c55e" : job.risk === "HIGH" ? "#ef4444" : "#f59e0b";
+  const pill = (text, color) => <span style={{ border: `1px solid ${color}`, color, padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{text}</span>;
+  return <div style={{ background: p.card, border: `1px solid ${p.border}`, borderLeft: `3px solid ${vt.color}`, borderRadius: 10, marginBottom: 12, boxShadow: p.shadow, animation: `slideIn .25s ease ${idx * .03}s both` }}>
+    <div onClick={() => setOpen(!open)} style={{ padding: 16, cursor: "pointer" }}>
+      <div style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 7 }}><strong style={{ color: p.text, fontSize: 16, fontFamily: "'Syne',sans-serif" }}>{job.company}</strong>{pill(dolLabel, dolColor)}{pill(`${season.icon} ${season.label}`, season.color)}{pill(`${language.icon} ${language.label}`, language.color)}{pill(`Risco ${job.risk || "MEDIUM"}`, riskColor)}{pill(`Aderência ${score}%`, vt.color)}</div>
+          <div style={{ color: p.sub, fontSize: 12, lineHeight: 1.7 }}>💼 {job.position} · 📍 {job.location} · 👥 {job.openings} · <span style={{ color: "#22c55e" }}>💰 {job.wage}</span></div>
+          <div style={{ color: p.muted, fontSize: 11 }}>📅 {job.period}{job.housing && job.housing !== "N/A" ? ` · 🏠 ${job.housing}` : ""}</div>
+        </div>
+        <div onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <AppButton onClick={() => onToggleFavorite && onToggleFavorite(job)} style={{ background: saved ? "#16a34a" : p.soft, color: saved ? "#fff" : p.sub, border: `1px solid ${saved ? "#16a34a" : p.border}` }}>{saved ? "★ Salva" : "☆ Salvar"}</AppButton>
+          <AppButton onClick={() => alert(`Aderência estimada: ${score}%\n\nMotivos: tipo de vaga, DOL, moradia, risco e aderência ao perfil agrícola/TI.`)} style={{ background: p.soft, color: p.sub, border: `1px solid ${p.border}` }}>🎯 Perfil</AppButton>
+          <AppButton onClick={() => setCheck(!check)} style={{ background: p.soft, color: p.sub, border: `1px solid ${p.border}` }}>✅ Checklist</AppButton>
+          <AppButton onClick={() => generatePDF(job, visaType, meta)} style={{ background: "#1d4ed8", color: "#fff" }}>📄 PDF</AppButton>
+        </div>
+      </div>
+    </div>
+    {check && <div style={{ borderTop: `1px solid ${p.border}`, padding: "12px 16px", color: p.sub, fontSize: 12 }}><strong style={{ color: p.text }}>Checklist antes de aplicar</strong><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 6, marginTop: 8 }}>{CHECKLIST.map(item => <label key={item} style={{ display: "flex", gap: 6 }}><input type="checkbox" />{item}</label>)}</div></div>}
+    {open && <div style={{ borderTop: `1px solid ${p.border}`, padding: "13px 16px 16px", color: p.sub, fontSize: 12, lineHeight: 1.7 }}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 8, marginBottom: 10 }}>{[["Certificação", job.dolCert], ["NAICS", job.naicsCode], ["Contato", job.contactName || job.contact], ["E-mail", job.contactEmail || job.agentEmail]].map(([l, v]) => <Info key={l} p={p} label={l} value={v || "—"} />)}</div>{job.flags && <div style={{ background: p.soft, border: `1px solid ${p.border}`, padding: 10, borderRadius: 8 }}>⚑ {job.flags}</div>}{job.source && <a href={job.source} target="_blank" rel="noreferrer" style={{ color: "#3b82f6", display: "block", marginTop: 10 }}>🔗 Fonte oficial</a>}</div>}
+  </div>;
+}
+
+function Info({ label, value, p }) {
+  return <div style={{ background: p.soft, border: `1px solid ${p.border}`, padding: 10, borderRadius: 8 }}><div style={{ color: p.muted, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div><div style={{ color: p.text, marginTop: 3 }}>{value}</div></div>;
+}
+
+function Sec({ label, children, p }) {
+  return <div style={{ marginBottom: 19 }}><div style={{ color: p.muted, fontSize: 9, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, fontFamily: "'JetBrains Mono',monospace" }}>{label}</div>{children}</div>;
+}
+
+export default function App() {
+  const [authUser, setAuthUser] = useState(() => getToken() ? getUser() : null);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem("h2-theme") || "dark");
+  const p = themePalette(theme);
+  const [visaType, setVisaType] = useState("H2A");
+  const [category, setCategory] = useState(VISA_TYPES.H2A.categories[0]);
+  const [state, setState] = useState("Florida");
+  const [provider, setProvider] = useState("openrouter");
+  const [model, setModel] = useState(PROVIDERS.openrouter.models[0].id);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [extra, setExtra] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [error, setError] = useState(null);
+  const [tab, setTab] = useState("dashboard");
+  const [history, setHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("h2_scan_history") || "[]"); }
+    catch { return []; }
+  });
+  const [favorites, setFavorites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("h2_favorites") || "[]"); }
+    catch { return []; }
+  });
+
+
+  useEffect(() => { localStorage.setItem("h2-theme", theme); document.documentElement.dataset.theme = theme; }, [theme]);
+  useEffect(() => { if (!getToken()) setAuthUser(null); }, []);
+  useEffect(() => { if (authUser) refreshAiStatus(); }, [authUser]);
+
+  useEffect(() => {
+    try {
+      const lastJobs = JSON.parse(localStorage.getItem("h2_last_jobs") || "[]");
+      const lastSummary = JSON.parse(localStorage.getItem("h2_last_summary") || "null");
+      if (lastJobs.length && jobs.length === 0) {
+        setJobs(lastJobs);
+        setSummary(lastSummary);
+      }
+    } catch {}
+  }, []);
+
+  const vt = VISA_TYPES[visaType];
+  const prov = PROVIDERS[provider];
+  const meta = { category: category.label, state, certLabel: vt.certLabel };
+  const addLog = useCallback(m => setLogs(prev => [...prev, m]), []);
+
+  async function refreshAiStatus() {
+    const res = await apiFetch("/api/ai/status");
+    if (res.ok) {
+      const data = await res.json();
+      setAiStatus(data);
+      const preferred = localStorage.getItem("h2_ai_provider");
+      const providers = data.providers || {};
+      const selected =
+        preferred && providers[preferred]?.configured && PROVIDERS[preferred]
+          ? [preferred, providers[preferred]]
+          : Object.entries(providers).find(([key, value]) => value.configured && PROVIDERS[key]);
+      if (selected) {
+        setProvider(selected[0]);
+        setModel(PROVIDERS[selected[0]].models[0].id);
+      }
+    }
+  }
+
+  if (!authUser) return <Login onLogin={u => setAuthUser(u)} />;
+
+  const favoriteKey = job => `${job.company || ""}|${job.position || ""}|${job.location || ""}|${job.period || ""}`;
+
+  const isFavorite = job => favorites.some(f => favoriteKey(f) === favoriteKey(job));
+
+  const toggleFavorite = job => {
+    setFavorites(prev => {
+      const key = favoriteKey(job);
+      const exists = prev.some(f => favoriteKey(f) === key);
+      const next = exists ? prev.filter(f => favoriteKey(f) !== key) : [{ ...job, savedAt: new Date().toISOString() }, ...prev];
+      localStorage.setItem("h2_favorites", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const scan = async () => {
+    setLoading(true); setJobs([]); setLogs([]); setSummary(null); setError(null);
+    addLog(`🚀 ${visaType} — ${category.label} | ${state} | ${CURRENT_YEAR}`);
+    addLog(`🤖 IA selecionada: ${aiStatus?.configured ? prov.short : "não configurada"}`);
+    try {
+      if (!aiStatus?.configured) throw new Error("Nenhum motor de IA configurado no servidor. Configure uma chave no .env ou no ambiente.");
+      const raw = await callAPI(provider, model, buildPrompt(visaType, category, state, extra));
+      const start = raw.indexOf("{"), end = raw.lastIndexOf("}");
+      if (start === -1) throw new Error("JSON não encontrado na resposta da IA");
+      const parsed = JSON.parse(raw.slice(start, end + 1));
+      (parsed.logs || []).forEach(addLog);
+      const enriched = (parsed.jobs || []).map(j => ({ ...j, matchScore: j.matchScore || calcMatch(j) }));
+      setJobs(enriched); setSummary(parsed.summary || null); setTab("results");
+      localStorage.setItem("h2_last_jobs", JSON.stringify(enriched));
+      localStorage.setItem("h2_last_summary", JSON.stringify(parsed.summary || null));
+
+      setHistory(h => {
+        const next = [{ id: Date.now(), visaType, category: category.label, state, provider: prov.short, jobs: enriched.length, verified: parsed.summary?.verified || 0, ts: new Date().toLocaleString("pt-BR") }, ...h.slice(0, 24)];
+        localStorage.setItem("h2_scan_history", JSON.stringify(next));
+        return next;
+      });
+      addLog(`📊 ${enriched.length} vagas — ${parsed.summary?.verified || 0} verificadas`);
+    } catch (err) { setError(err.message); addLog("❌ " + err.message); }
+    finally { setLoading(false); }
+  };
+
+  const exportCSV = () => {
+    const header = ["Empresa", "Cargo", "Local", "Vagas", "Salário", "Período", "Temporada", "Idioma", "DOL", "Cert", "NAICS", "Risco", "Aderência", "Fonte"];
+    const rows = jobs.map(j => [j.company, j.position, j.location, j.openings, j.wage, j.period, inferSeasonType(j).label, inferLanguagePreference(j).label, j.dolStatus, j.dolCert, j.naicsCode, j.risk, j.matchScore || calcMatch(j), j.source].map(v => `"${String(v || "").replace(/"/g, '""')}"`).join(","));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([[header.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = `h2-${visaType}-${Date.now()}.csv`; a.click();
+  };
+  const exportJSON = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ summary, jobs, logs }, null, 2)], { type: "application/json" }));
+    a.download = `h2-${visaType}-${Date.now()}.json`; a.click();
+  };
+
+  const select = { width: "100%", background: p.input, border: `1px solid ${p.border}`, color: p.text, padding: "9px 10px", borderRadius: 8, fontSize: 12, fontFamily: "inherit" };
+  const topBtn = { background: p.soft, border: `1px solid ${p.border}`, color: p.sub, padding: "6px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" };
+
+  return <>
+    <style>{`@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500&display=swap');html,body,#root{margin:0!important;padding:0!important;background:${p.bg};width:100%;height:100%;}*{box-sizing:border-box}@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}button:focus-visible,input:focus,select:focus,textarea:focus{outline:2px solid #3b82f6;outline-offset:2px}`}</style>
+    <div style={{ background: p.bg, color: p.text, fontFamily: "'DM Sans',sans-serif", display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+      <header style={{ borderBottom: `1px solid ${p.border}`, padding: "12px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", background: p.panel }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}><div style={{ width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, background: `linear-gradient(135deg,${vt.accent},#7c3aed)` }}>🛂</div><div><div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 17 }}><span style={{ color: vt.color }}>H-2 Visa</span> Scanner Pro</div><div style={{ color: p.muted, fontSize: 9, fontFamily: "'JetBrains Mono',monospace" }}>DOL VALIDATOR · IA STATUS · TEMPORADA {CURRENT_YEAR}</div></div></div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {jobs.length > 0 && <><button onClick={exportCSV} style={topBtn}>⬇ CSV</button><button onClick={exportJSON} style={topBtn}>⬇ JSON</button><button onClick={() => jobs.forEach((j, i) => setTimeout(() => generatePDF(j, visaType, meta), i * 300))} style={topBtn}>📄 Todos PDFs</button></>}
+          <AiStatus status={aiStatus} p={p} />
+          <select value={theme} onChange={e => setTheme(e.target.value)} style={{ ...topBtn, padding: "6px 8px" }}><option value="dark">🌙 Escuro</option><option value="light">☀️ Claro</option><option value="system">💻 Sistema</option></select>
+          <span style={{ color: p.muted, fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>{authUser.username}</span>
+          <button onClick={() => setShowAdmin(true)} style={topBtn}>👤 Minha Conta</button>
+          {isAdmin() && <button onClick={() => setShowAdmin(true)} style={{ ...topBtn, borderColor: "#3b82f6", color: "#3b82f6" }}>⚙️ Admin</button>}
+          <button onClick={() => { clearToken(); setAuthUser(null); }} style={{ ...topBtn, borderColor: "#991b1b", color: "#f87171" }}>⏏ Sair</button>
+        </div>
+      </header>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <aside style={{ width: 280, flexShrink: 0, borderRight: `1px solid ${p.border}`, padding: 18, background: p.panel, overflowY: "auto" }}>
+          <Sec label="Tipo de visto" p={p}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{Object.entries(VISA_TYPES).map(([k, v]) => <button key={k} onClick={() => { setVisaType(k); setCategory(VISA_TYPES[k].categories[0]); setJobs([]); setLogs([]); setSummary(null); }} style={{ background: visaType === k ? `${v.accent}22` : p.card, border: `1px solid ${visaType === k ? v.color : p.border}`, color: visaType === k ? v.color : p.sub, padding: 10, borderRadius: 9, cursor: "pointer" }}><div style={{ fontSize: 20 }}>{v.icon}</div><strong>{v.label}</strong></button>)}</div></Sec>
+          <Sec label="Setor" p={p}><div style={{ display: "flex", flexDirection: "column", gap: 4 }}>{vt.categories.map(c => <button key={c.id} onClick={() => setCategory(c)} style={{ background: category.id === c.id ? `${vt.accent}22` : "transparent", border: `1px solid ${category.id === c.id ? vt.color : "transparent"}`, color: category.id === c.id ? vt.color : p.sub, padding: "8px 10px", borderRadius: 7, cursor: "pointer", textAlign: "left" }}>{c.label}</button>)}</div></Sec>
+          <Sec label="Estado (EUA)" p={p}><select value={state} onChange={e => setState(e.target.value)} style={select}>{US_STATES.map(s => <option key={s}>{s}</option>)}</select></Sec>
+          <Sec label="Status da IA" p={p}><div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 9, padding: 12 }}><AiStatus status={aiStatus} p={p} /><div style={{ color: p.muted, fontSize: 11, marginTop: 9, lineHeight: 1.6 }}>O usuário comum não escolhe o motor. O sistema usa automaticamente o primeiro provider configurado no servidor. A escolha detalhada fica no Admin.</div><button onClick={refreshAiStatus} style={{ ...topBtn, marginTop: 10 }}>🔄 Atualizar status</button></div></Sec>
+          <Sec label="Instruções adicionais" p={p}><textarea value={extra} onChange={e => setExtra(e.target.value)} placeholder="Ex: Prefiro empresas com brasileiros, mínimo $16/hr, moradia incluída..." rows={4} style={{ ...select, resize: "vertical", lineHeight: 1.5 }} /></Sec>
+          <AppButton onClick={scan} disabled={loading} style={{ width: "100%", padding: "12px 0", background: loading ? p.soft : `linear-gradient(135deg,${vt.accent},#7c3aed)`, color: "#fff", fontFamily: "'Syne',sans-serif", fontWeight: 800 }}>{loading ? "⏳ Varrendo..." : `🔍 Varrer ${visaType} ${CURRENT_YEAR}`}</AppButton>
+          {error && <div style={{ background: "#1c0a0a", border: "1px solid #991b1b", color: "#fca5a5", padding: 10, borderRadius: 8, fontSize: 12, marginTop: 10 }}>{error}</div>}
+          <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 8, padding: 10, marginTop: 10, color: p.muted, fontSize: 11, lineHeight: 1.6 }}>{vt.dolInfo}</div>
+        </aside>
+        <main style={{ flex: 1, padding: "20px 24px", overflowY: "auto", background: p.bg }}>
+          {jobs.length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px,1fr))", gap: 10, marginBottom: 18 }}>{[["Total", jobs.length, vt.color, "📋"], ["Verificadas", jobs.filter(j => j.dolStatus === "VERIFIED").length, "#22c55e", "✅"], ["Pendentes", jobs.filter(j => j.dolStatus === "PENDING").length, "#f59e0b", "⏳"], ["Não encontradas", jobs.filter(j => j.dolStatus === "NOT_FOUND").length, "#ef4444", "❌"], ["Risco baixo", jobs.filter(j => j.risk === "LOW").length, "#8b5cf6", "🟢"]].map(([l, v, c, i]) => <div key={l} style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 14, textAlign: "center", boxShadow: p.shadow }}><div>{i}</div><div style={{ color: c, fontSize: 24, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{v}</div><div style={{ color: p.muted, fontSize: 9, textTransform: "uppercase" }}>{l}</div></div>)}</div>}
+          {(jobs.length > 0 || logs.length > 0) && <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${p.border}`, marginBottom: 16 }}>{[["results", `📋 Resultados (${jobs.length})`], ["favorites", `⭐ Favoritos (${favorites.length})`], ["terminal", "⚡ Terminal"], ["history", "🕘 Histórico"]].map(([t, l]) => <button key={t} onClick={() => setTab(t)} style={{ background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${vt.color}` : "2px solid transparent", color: tab === t ? vt.color : p.muted, padding: "9px 14px", cursor: "pointer", fontWeight: 800 }}>{l}</button>)}</div>}
+          {tab === "results" && <>{summary && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#bbf7d0", borderRadius: 10, padding: 16, marginBottom: 16 }}><strong style={{ color: "#4ade80" }}>💡 Recomendação Estratégica</strong>{summary.bestPick && <div style={{ marginTop: 6 }}>🏆 {summary.bestPick}</div>}<div style={{ marginTop: 5 }}>{summary.recommendation}</div></div>}{jobs.length > 0 ? jobs.map((j, i) => <JobCard key={i} job={j} idx={i} vt={vt} p={p} visaType={visaType} meta={meta} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />) : !loading && <Empty vt={vt} p={p} />}</>}
+          {tab === "favorites" && <div>
+            {favorites.length ? favorites.map((j, i) => (
+              <JobCard key={favoriteKey(j)} job={j} idx={i} vt={vt} p={p} visaType={visaType} meta={meta} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
+            )) : <div style={{ color: p.muted, background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 20 }}>
+              Nenhuma vaga salva ainda. Clique em <strong>☆ Salvar</strong> em qualquer vaga para adicioná-la aqui.
+            </div>}
+          </div>}
+
+          {tab === "dashboard" && <div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, marginBottom: 16 }}>
+              <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 16 }}>
+                <div style={{ color: p.muted, fontSize: 11 }}>Vagas salvas</div>
+                <div style={{ color: vt.color, fontSize: 30, fontWeight: 800 }}>{favorites.length}</div>
+              </div>
+              <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 16 }}>
+                <div style={{ color: p.muted, fontSize: 11 }}>Varreduras feitas</div>
+                <div style={{ color: "#60a5fa", fontSize: 30, fontWeight: 800 }}>{history.length}</div>
+              </div>
+              <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 16 }}>
+                <div style={{ color: p.muted, fontSize: 11 }}>Últimos resultados</div>
+                <div style={{ color: "#f59e0b", fontSize: 30, fontWeight: 800 }}>{jobs.length}</div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              <button onClick={restoreLastResults} style={{ ...topBtn, borderColor: "#3b82f6", color: "#60a5fa" }}>↩ Restaurar últimos resultados</button>
+              <button onClick={() => setTab("favorites")} style={{ ...topBtn, borderColor: "#16a34a", color: "#4ade80" }}>⭐ Ver favoritos</button>
+              <button onClick={clearDashboardData} style={{ ...topBtn, borderColor: "#991b1b", color: "#f87171" }}>🗑 Limpar dados locais</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
+              <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 16 }}>
+                <h3 style={{ marginTop: 0, color: p.text }}>⭐ Últimas vagas salvas</h3>
+                {favorites.slice(0, 5).length ? favorites.slice(0, 5).map(f => (
+                  <div key={favoriteKey(f)} style={{ borderTop: `1px solid ${p.border}`, padding: "9px 0", color: p.sub }}>
+                    <strong style={{ color: p.text }}>{f.company}</strong><br/>
+                    <span style={{ fontSize: 12 }}>{f.position} · {f.location}</span>
+                  </div>
+                )) : <div style={{ color: p.muted }}>Nenhuma vaga salva ainda.</div>}
+              </div>
+
+              <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 16 }}>
+                <h3 style={{ marginTop: 0, color: p.text }}>🕘 Histórico recente</h3>
+                {history.slice(0, 5).length ? history.slice(0, 5).map(h => (
+                  <div key={h.id} style={{ borderTop: `1px solid ${p.border}`, padding: "9px 0", color: p.sub }}>
+                    <strong style={{ color: p.text }}>{h.visaType} · {h.category}</strong><br/>
+                    <span style={{ fontSize: 12 }}>{h.state} · {h.jobs} vagas · {h.ts}</span>
+                  </div>
+                )) : <div style={{ color: p.muted }}>Nenhuma varredura registrada.</div>}
+              </div>
+            </div>
+          </div>}
+
+          {tab === "favorites" && <div>
+            {favorites.length ? favorites.map((j, i) => (
+              <JobCard key={favoriteKey(j)} job={j} idx={i} vt={vt} p={p} visaType={visaType} meta={meta} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
+            )) : <div style={{ color: p.muted, background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 20 }}>
+              Nenhuma vaga salva ainda. Clique em <strong>☆ Salvar</strong> em qualquer vaga para adicioná-la aqui.
+            </div>}
+          </div>}
+
+          {tab === "terminal" && <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 10, padding: 16, color: p.sub, fontFamily: "'JetBrains Mono',monospace", minHeight: 120 }}>{logs.length ? logs.map((l, i) => <div key={i}><span style={{ color: p.muted }}>{String(i + 1).padStart(3, "0")}</span> {l}</div>) : "$ aguardando varredura..."}</div>}
+          {tab === "history" && <div>{history.length ? history.map(h => <div key={h.id} style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: 9, padding: 12, marginBottom: 8, color: p.sub }}>{h.visaType} · {h.category} · {h.state} · {h.jobs} vagas · {h.ts}</div>) : <div style={{ color: p.muted }}>Nenhuma busca ainda.</div>}</div>}
+          {!loading && jobs.length === 0 && logs.length === 0 && tab === "results" && <Empty vt={vt} p={p} />}
+        </main>
+      </div>
+    </div>
+    {showAdmin && <AdminPanel onClose={() => { setShowAdmin(false); refreshAiStatus(); }} />}
+  </>;
+}
+
+function Empty({ vt, p }) {
+  return <div style={{ textAlign: "center", padding: "64px 20px", color: p.muted }}><div style={{ fontSize: 52 }}>{vt.icon}</div><h2 style={{ color: p.text, fontFamily: "'Syne',sans-serif" }}>Configure e inicie a varredura</h2><p>Selecione visto, setor e estado. O motor de IA é escolhido automaticamente conforme configuração do servidor.</p></div>;
+}

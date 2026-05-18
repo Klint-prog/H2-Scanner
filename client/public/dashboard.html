@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — H-2 Visa Scanner Pro</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap');
+    :root{--bg:#020408;--panel:#0a0a0f;--soft:#0f172a;--border:#1e293b;--text:#f1f5f9;--muted:#64748b;--sub:#94a3b8;--green:#22c55e;--blue:#60a5fa;--yellow:#f59e0b;--red:#f87171;--purple:#a78bfa}
+    *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif} body{min-height:100vh;padding:22px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}.brand{display:flex;gap:12px;align-items:center}.logo{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#16a34a,#7c3aed);font-size:22px}.title{font-family:'Syne',sans-serif;font-weight:800;font-size:21px}.subtitle{font:11px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.8px;margin-top:3px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border);background:var(--soft);color:var(--sub);border-radius:8px;padding:9px 12px;text-decoration:none;cursor:pointer;font-weight:800;font-size:12px}.btn:hover{border-color:var(--blue);color:#fff}.danger{border-color:#7f1d1d;color:var(--red)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}.metric-label{font:11px 'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:1px}.metric-value{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:800;margin-top:5px}.green{color:var(--green)}.blue{color:var(--blue)}.yellow{color:var(--yellow)}.purple{color:var(--purple)}
+    h2{font-family:'Syne',sans-serif;font-size:16px;margin:0 0 12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.item{border-top:1px solid var(--border);padding:11px 0}.item:first-of-type{border-top:none}.item-title{font-weight:800}.item-meta{color:var(--sub);font-size:12px;margin-top:4px;line-height:1.5}.badge{display:inline-flex;margin-top:6px;margin-right:6px;border:1px solid #334155;border-radius:999px;padding:2px 8px;color:var(--sub);font:10px 'JetBrains Mono',monospace}.empty{color:var(--muted);padding:16px;background:var(--soft);border:1px dashed #334155;border-radius:10px}.footer{margin-top:18px;color:var(--muted);font-size:11px;line-height:1.5}.list-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}@media(max-width:800px){body{padding:14px}.two{grid-template-columns:1fr}.title{font-size:18px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="logo">📊</div><div><div class="title">Dashboard de Atividades</div><div class="subtitle">FAVORITOS · HISTÓRICO · ÚLTIMOS RESULTADOS LOCAIS</div></div></div>
+    <div class="actions"><a class="btn" href="/">← Voltar ao Scanner</a><button class="btn" onclick="reloadData()">🔄 Atualizar</button><button class="btn danger" onclick="clearLocalData()">🗑 Limpar dados locais</button></div>
+  </header>
+  <section class="grid">
+    <div class="card"><div class="metric-label">Vagas salvas</div><div class="metric-value green" id="favCount">0</div></div>
+    <div class="card"><div class="metric-label">Varreduras no histórico</div><div class="metric-value blue" id="histCount">0</div></div>
+    <div class="card"><div class="metric-label">Últimos resultados</div><div class="metric-value yellow" id="lastCount">0</div></div>
+    <div class="card"><div class="metric-label">Última atividade</div><div class="metric-value purple" id="lastActivity" style="font-size:17px">—</div></div>
+  </section>
+  <section class="two">
+    <div class="card"><h2>⭐ Vagas favoritas</h2><div id="favorites"></div><div class="list-actions"><button class="btn" onclick="downloadJson('h2_favorites','favoritos-h2.json')">⬇ Exportar favoritos</button></div></div>
+    <div class="card"><h2>🕘 Histórico de varreduras</h2><div id="history"></div><div class="list-actions"><button class="btn" onclick="downloadJson('h2_scan_history','historico-h2.json')">⬇ Exportar histórico</button></div></div>
+  </section>
+  <section class="card" style="margin-top:14px"><h2>📋 Últimos resultados salvos localmente</h2><div id="lastJobs"></div><div class="footer">Esta tela lê apenas dados do navegador via localStorage. Ela não consome tokens de IA e não executa nova varredura. Para uma versão SaaS futura, estes dados devem migrar para banco de dados por usuário.</div></section>
+<script>
+  const get = (key, fallback=[]) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; } };
+  const safe = v => String(v || '—');
+  const jobKey = j => `${j.company || ''}|${j.position || ''}|${j.location || ''}|${j.period || ''}`;
+  function jobItem(j){ return `<div class="item"><div class="item-title">${safe(j.company)}</div><div class="item-meta">${safe(j.position)} · ${safe(j.location)}<br>${safe(j.wage)} · ${safe(j.period)}</div><span class="badge">${safe(j.dolStatus)}</span><span class="badge">Risco ${safe(j.risk)}</span><span class="badge">Aderência ${safe(j.matchScore)}%</span></div>`; }
+  function histItem(h){ return `<div class="item"><div class="item-title">${safe(h.visaType)} · ${safe(h.category)}</div><div class="item-meta">${safe(h.state)} · ${safe(h.jobs)} vagas · ${safe(h.verified)} verificadas<br>${safe(h.provider)} · ${safe(h.ts)}</div></div>`; }
+  function reloadData(){
+    const fav = get('h2_favorites'); const hist = get('h2_scan_history'); const last = get('h2_last_jobs');
+    document.getElementById('favCount').textContent = fav.length;
+    document.getElementById('histCount').textContent = hist.length;
+    document.getElementById('lastCount').textContent = last.length;
+    document.getElementById('lastActivity').textContent = hist[0]?.ts || fav[0]?.savedAt?.slice(0,10) || '—';
+    document.getElementById('favorites').innerHTML = fav.length ? fav.map(jobItem).join('') : '<div class="empty">Nenhuma vaga favorita salva ainda.</div>';
+    document.getElementById('history').innerHTML = hist.length ? hist.map(histItem).join('') : '<div class="empty">Nenhuma varredura registrada ainda.</div>';
+    document.getElementById('lastJobs').innerHTML = last.length ? last.map(jobItem).join('') : '<div class="empty">Nenhum resultado salvo localmente. Faça uma varredura no scanner para preencher esta seção.</div>';
+  }
+  function downloadJson(key, filename){ const data = localStorage.getItem(key) || '[]'; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type:'application/json'})); a.download = filename; a.click(); }
+  function clearLocalData(){ if(!confirm('Limpar favoritos, histórico e últimos resultados locais?')) return; ['h2_favorites','h2_scan_history','h2_last_jobs','h2_last_summary'].forEach(k => localStorage.removeItem(k)); reloadData(); }
+  reloadData();
+</script>
+</body>
+</html>

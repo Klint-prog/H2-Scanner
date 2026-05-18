@@ -33,9 +33,11 @@ export default function Login({ onLogin }) {
     setLoading(true);
     try {
       const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const loginAliasKey = `h2_login_alias:${username.toLowerCase()}`;
+      const resolvedUsername = username.includes("@") ? (localStorage.getItem(loginAliasKey) || username) : username;
       const body = mode === "register"
         ? { username, email, password: form.password, country: form.country.trim(), goal: form.goal }
-        : { username, login: username, password: form.password };
+        : { username: resolvedUsername, login: username, password: form.password };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,6 +45,7 @@ export default function Login({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao autenticar");
+      if (mode === "register" && email) localStorage.setItem(`h2_login_alias:${email}`, username);
       setToken(data.token);
       if (data.user?.role === "admin") {
         window.location.href = "/admin-dashboard.html";

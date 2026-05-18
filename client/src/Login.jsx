@@ -24,6 +24,8 @@ export default function Login({ onLogin }) {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    const username = form.username.trim();
+    const email = form.email.trim().toLowerCase();
     if (mode === "register" && form.password !== form.confirmPassword) {
       setError("As senhas não conferem");
       return;
@@ -32,8 +34,8 @@ export default function Login({ onLogin }) {
     try {
       const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
       const body = mode === "register"
-        ? { username: form.username, email: form.email, password: form.password, country: form.country, goal: form.goal }
-        : { username: form.username, password: form.password };
+        ? { username, email, password: form.password, country: form.country.trim(), goal: form.goal }
+        : { username, login: username, password: form.password };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,8 +90,8 @@ export default function Login({ onLogin }) {
             </div>
 
             <form onSubmit={submit}>
-              <Field label="Usuário">
-                <input type="text" value={form.username} onChange={e => setField("username", e.target.value)} placeholder="seu.usuario" autoComplete="username" required style={baseInput} />
+              <Field label={mode === "login" ? "Usuário ou e-mail" : "Usuário"}>
+                <input type="text" value={form.username} onChange={e => setField("username", e.target.value)} placeholder={mode === "login" ? "seu.usuario ou seu@email.com" : "seu.usuario"} autoComplete="username" required style={baseInput} />
               </Field>
 
               {mode === "register" && <Field label="E-mail">

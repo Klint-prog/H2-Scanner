@@ -40,7 +40,7 @@ const VISA_TYPES = {
 
 const PROVIDERS = {
   anthropic: { short: "Claude", endpoint: "/api/anthropic", models: [{ id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" }, { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" }] },
-  openrouter: { short: "OpenRouter", endpoint: "/api/openrouter", models: [{ id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" }, { id: "openai/gpt-4o-mini", label: "GPT-4o Mini" }, { id: "openai/gpt-4o", label: "GPT-4o" }] },
+  openrouter: { short: "OpenRouter", endpoint: "/api/openrouter", models: [{ id: "openai/gpt-4o-mini", label: "GPT-4o Mini" }, { id: "openai/gpt-4o", label: "GPT-4o" }, { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" }] },
   openai: { short: "OpenAI", endpoint: "/api/openai", models: [{ id: "gpt-4o-mini", label: "GPT-4o Mini" }, { id: "gpt-4o", label: "GPT-4o" }] },
 };
 
@@ -67,7 +67,14 @@ function calcMatch(job) {
 
 async function callAPI(provider, model, prompt) {
   const ep = PROVIDERS[provider].endpoint;
-  const body = provider === "anthropic" ? { model, max_tokens: 2000, messages: [{ role: "user", content: prompt }] } : { model, max_tokens: 2000, messages: [{ role: "user", content: prompt }], ...(provider === "openai" ? { response_format: { type: "json_object" } } : {}) };
+  const body = provider === "anthropic"
+    ? { model, max_tokens: 5000, messages: [{ role: "user", content: prompt }] }
+    : {
+        model,
+        max_tokens: 5000,
+        messages: [{ role: "user", content: prompt }],
+        ...(["openai", "openrouter"].includes(provider) ? { response_format: { type: "json_object" } } : {})
+      };
   const res = await apiFetch(ep, { method: "POST", body });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -78,7 +85,7 @@ async function callAPI(provider, model, prompt) {
 }
 
 function buildPrompt(visaType, category, state, extra) {
-  return `You are an expert ${visaType} visa job researcher. Today is ${new Date().toISOString().slice(0, 10)} (${CURRENT_YEAR}).\nTASK: Find CURRENT active ${visaType} postings for 2025/2026 season in "${state}" USA.\nCATEGORY: ${category.label} — query: "${category.query}"\nSkip anything from 2024 or older.\nReturn 6-9 employers with company, title, location, openings, wage, period, housing, DOL status, cert number, NAICS, contacts, source URL, compliance notes, risk and matchScore.\n${extra ? `EXTRA: ${extra}` : ""}\nRespond ONLY valid JSON, no markdown: {"jobs":[{"company":"","position":"","location":"","openings":"","wage":"","period":"Apr 2026 – Nov 2026","housing":"Yes|No|N/A","dolStatus":"VERIFIED|PENDING|NOT_FOUND","dolCert":"","naicsCode":"","contactName":"","contactEmail":"","contactPhone":"","contactAddress":"","agentName":"","agentEmail":"","contact":"","source":"","flags":"","risk":"LOW|MEDIUM|HIGH","matchScore":80}],"logs":["🔍 Buscando..."],"summary":{"verified":0,"pending":0,"notFound":0,"bestPick":"Empresa — motivo em português","recommendation":"2-3 frases em português"}}`;
+  return `You are an expert ${visaType} visa job researcher. Today is ${new Date().toISOString().slice(0, 10)} (${CURRENT_YEAR}).\nTASK: Find CURRENT active ${visaType} postings for 2025/2026 season in "${state}" USA.\nCATEGORY: ${category.label} — query: "${category.query}"\nSkip anything from 2024 or older.\nReturn 4-6 employers with company, title, location, openings, wage, period, housing, DOL status, cert number, NAICS, contacts, source URL, compliance notes, risk and matchScore. Keep values concise.\n${extra ? `EXTRA: ${extra}` : ""}\nRespond ONLY valid JSON, no markdown: {"jobs":[{"company":"","position":"","location":"","openings":"","wage":"","period":"Apr 2026 – Nov 2026","housing":"Yes|No|N/A","dolStatus":"VERIFIED|PENDING|NOT_FOUND","dolCert":"","naicsCode":"","contactName":"","contactEmail":"","contactPhone":"","contactAddress":"","agentName":"","agentEmail":"","contact":"","source":"","flags":"","risk":"LOW|MEDIUM|HIGH","matchScore":80}],"logs":["🔍 Buscando..."],"summary":{"verified":0,"pending":0,"notFound":0,"bestPick":"Empresa — motivo em português","recommendation":"2-3 frases em português"}}`;
 }
 
 function generatePDF(job, visaType, meta) {

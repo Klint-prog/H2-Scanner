@@ -42,6 +42,10 @@ export default function Login({ onLogin }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao autenticar");
       setToken(data.token);
+      if (data.user?.role === "admin") {
+        window.location.href = "/admin-dashboard.html";
+        return;
+      }
       onLogin(data.user);
     } catch (err) {
       setError(err.message);

@@ -7,11 +7,20 @@
     <meta name="description" content="Varredura inteligente de vagas H-2A e H-2B com validação DOL" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛂</text></svg>" />
     <style>
-      .global-dashboard-link {
+      .dashboard-shortcuts {
         position: fixed;
         right: 18px;
-        bottom: 18px;
+        top: 74px;
         z-index: 2147483000;
+        display: none;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      }
+      .dashboard-shortcuts.is-visible {
+        display: flex;
+      }
+      .dashboard-shortcut-link {
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -25,12 +34,64 @@
         box-shadow: 0 16px 38px rgba(0, 0, 0, .36);
         backdrop-filter: blur(10px);
       }
-      .global-dashboard-link:hover { border-color: #60a5fa; color: #ffffff; }
+      .dashboard-shortcut-link:hover {
+        border-color: #60a5fa;
+        color: #ffffff;
+      }
+      .dashboard-shortcut-link.admin-only {
+        display: none;
+        border-color: rgba(168, 85, 247, .55);
+        color: #ede9fe;
+      }
+      .dashboard-shortcuts.is-admin .dashboard-shortcut-link.admin-only {
+        display: inline-flex;
+      }
+      @media (max-width: 700px) {
+        .dashboard-shortcuts {
+          top: auto;
+          bottom: 18px;
+          right: 14px;
+        }
+        .dashboard-shortcut-link {
+          padding: 10px 12px;
+          font-size: 11px;
+        }
+      }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <a class="global-dashboard-link" href="/dashboard.html" title="Abrir dashboard de atividades">📊 Dashboard</a>
+    <div id="dashboard-shortcuts" class="dashboard-shortcuts" aria-label="Atalhos de dashboard">
+      <a class="dashboard-shortcut-link admin-only" href="/admin-dashboard.html" title="Abrir dashboard administrativo">👑 Admin Dashboard</a>
+      <a class="dashboard-shortcut-link" href="/dashboard.html" title="Abrir dashboard de atividades">📊 Meu Dashboard</a>
+    </div>
+    <script>
+      (function () {
+        function parseJwt(token) {
+          try {
+            return JSON.parse(atob(token.split('.')[1] || ''));
+          } catch (_) {
+            return null;
+          }
+        }
+
+        function updateDashboardShortcuts() {
+          var box = document.getElementById('dashboard-shortcuts');
+          if (!box) return;
+
+          var token = localStorage.getItem('h2_token');
+          var user = token ? parseJwt(token) : null;
+
+          box.classList.toggle('is-visible', Boolean(user));
+          box.classList.toggle('is-admin', user && user.role === 'admin');
+        }
+
+        updateDashboardShortcuts();
+        window.addEventListener('storage', updateDashboardShortcuts);
+        window.addEventListener('focus', updateDashboardShortcuts);
+        setInterval(updateDashboardShortcuts, 1500);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -1,4 +1,8 @@
+const fs = require("fs");
+const path = require("path");
 const nodemailer = require("nodemailer");
+
+const SETTINGS_PATH = process.env.SMTP_SETTINGS_PATH || path.join(__dirname, "data", "smtp-settings.json");
 
 function mask(value) {
   if (!value) return "";
@@ -7,7 +11,25 @@ function mask(value) {
   return `${text.slice(0, 2)}***${text.slice(-2)}`;
 }
 
-function getSmtpConfig() {
+function clean(value) {
+  return String(value || "").trim();
+}
+
+function readStoredConfig() {
+  try {
+    if (!fs.existsSync(SETTINGS_PATH)) return {};
+    return JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredConfig(config) {
+  fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(config, null, 2));
+}
+
+function getEnvConfig() {
   return {
     host: process.env.SMTP_HOST || "",
     port: Number(process.env.SMTP_PORT || 587),
@@ -16,7 +38,25 @@ function getSmtpConfig() {
     pass: process.env.SMTP_PASS || "",
     from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
     replyTo: process.env.SMTP_REPLY_TO || process.env.SMTP_USER || "",
+    source: "env",
   };
+}
+
+function getSmtpConfig() {
+  const stored = readStoredConfig();
+  const env = getEnvConfig();
+  const merged = {
+    host: stored.host || env.host,
+    port: Number(stored.port || env.port || 587),
+    secure: Boolean(stored.secure ?? env.secure),
+    user: stored.user || env.user,
+    pass: stored.pass || env.pass,
+    from: stored.from || env.from,
+    replyTo: stored.replyTo || env.replyTo,
+    source: stored.host ? "admin_panel" : env.source,
+    updatedAt: stored.updatedAt || null,
+  };
+  return merged;
 }
 
 function publicSmtpConfig() {
@@ -29,13 +69,15 @@ function publicSmtpConfig() {
     user: mask(cfg.user),
     from: cfg.from,
     replyTo: cfg.replyTo,
+    source: cfg.source,
+    updatedAt: cfg.updatedAt,
   };
 }
 
 function createTransporter() {
   const cfg = getSmtpConfig();
   if (!cfg.host || !cfg.user || !cfg.pass || !cfg.from) {
-    throw new Error("SMTP não configurado. Defina SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM no .env.");
+    throw new Error("SMTP não configurado. Configure pelo painel Admin ou defina as variáveis SMTP no .env.");
   }
   return nodemailer.createTransport({
     host: cfg.host,
@@ -43,10 +85,6 @@ function createTransporter() {
     secure: cfg.secure,
     auth: { user: cfg.user, pass: cfg.pass },
   });
-}
-
-function clean(value) {
-  return String(value || "").trim();
 }
 
 function buildCandidateEmail({ job = {}, candidate = {}, message = "" }) {
@@ -86,6 +124,28 @@ ${clean(candidate.name) || "Candidate"}
 
 function registerSmtpRoutes(app, { requireAuth, requireAdmin }) {
   app.get("/api/admin/smtp/config", requireAuth, requireAdmin, (req, res) => {
+    res.json(publicSmtpConfig());
+  });
+
+  app.post("/api/admin/smtp/config", requireAuth, requireAdmin, (req, res) => {
+    const current = readStoredConfig();
+    const body = req.body || {};
+    const next = {
+      host: clean(body.host),
+      port: Number(body.port || 587),
+      secure: Boolean(body.secure),
+      user: clean(body.user),
+      pass: clean(body.pass) || current.pass || "",
+      from: clean(body.from),
+      replyTo: clean(body.replyTo),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (!next.host || !next.user || !next.from) {
+      return res.status(400).json({ error: "Host, usuário SMTP e remetente são obrigatórios." });
+    }
+
+    writeStoredConfig(next);
     res.json(publicSmtpConfig());
   });
 

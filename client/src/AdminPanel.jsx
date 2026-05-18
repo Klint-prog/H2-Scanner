@@ -74,7 +74,7 @@ export default function AdminPanel({ onClose }) {
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.8)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:16 }}>
-      <div style={{ background:"#0a0a0f", border:"1px solid #1e293b", borderRadius:12, width:"100%", maxWidth:760, maxHeight:"90vh", display:"flex", flexDirection:"column", overflow:"hidden", fontFamily:"'DM Sans',sans-serif" }}>
+      <div style={{ background:"#0a0a0f", border:"1px solid #1e293b", borderRadius:12, width:"100%", maxWidth:820, maxHeight:"90vh", display:"flex", flexDirection:"column", overflow:"hidden", fontFamily:"'DM Sans',sans-serif" }}>
         <div style={{ padding:"16px 20px", borderBottom:"1px solid #0f172a", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:16, color:"#f1f5f9" }}>⚙️ Painel Administrativo</div>
           <button onClick={onClose} style={{ background:"transparent", border:"1px solid #1e293b", color:"#64748b", width:32, height:32, borderRadius:6, cursor:"pointer", fontSize:16 }}>✕</button>
@@ -84,6 +84,7 @@ export default function AdminPanel({ onClose }) {
           {isAdmin() && tabBtn("users", "👥 Usuários")}
           {isAdmin() && tabBtn("create", "➕ Novo Usuário")}
           {isAdmin() && tabBtn("ai", "🤖 Status IA")}
+          {isAdmin() && tabBtn("smtp", "📧 E-mail SMTP")}
           {tabBtn("password", "🔑 Minha Senha")}
         </div>
 
@@ -167,6 +168,25 @@ export default function AdminPanel({ onClose }) {
 
             <button onClick={testAi} style={btn("#1d4ed8")}>🔄 Testar conexões</button>
             <div style={{ color:"#334155", fontSize:11, marginTop:10 }}>Última checagem: {aiStatus?.checkedAt || "—"}</div>
+          </div>}
+
+          {tab === "smtp" && isAdmin() && <div>
+            <div style={{ color:"#94a3b8", fontSize:13, lineHeight:1.6, marginBottom:14 }}>
+              Configure o servidor SMTP usado para enviar mensagens às empresas a partir das vagas favoritas. As credenciais ficam no backend e não são expostas ao usuário comum.
+            </div>
+            <div style={{ background:"#0f172a", border:"1px solid #1e293b", borderRadius:8, padding:16, marginBottom:14 }}>
+              <div style={{ color:"#f1f5f9", fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, marginBottom:6 }}>📧 Configuração de envio SMTP</div>
+              <div style={{ color:"#64748b", fontSize:12, lineHeight:1.6, marginBottom:14 }}>
+                Use esta área para cadastrar host, porta, usuário, senha/app password, remetente e testar envio. Após configurar, os favoritos poderão usar o envio de apresentação do candidato para a empresa.
+              </div>
+              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                <button onClick={() => { window.location.href = "/smtp-admin.html"; }} style={btn("#16a34a")}>⚙️ Abrir configuração SMTP</button>
+                <button onClick={() => { window.open("/smtp-admin.html", "_blank", "noopener,noreferrer"); }} style={{ ...btn("#0f172a", "#93c5fd"), border:"1px solid #1d4ed8" }}>↗ Abrir em nova aba</button>
+              </div>
+            </div>
+            <div style={{ background:"#1c1917", border:"1px solid #a16207", color:"#fbbf24", padding:12, borderRadius:8, fontSize:12, lineHeight:1.6 }}>
+              Recomendo usar senha de aplicativo do Gmail/Outlook, não a senha principal da conta. Nunca versionar credenciais no GitHub.
+            </div>
           </div>}
 
           {tab === "password" && <form onSubmit={changePw}><div style={{ display:"grid", gap:14 }}><Input label="Senha Atual"><input type="password" value={pwForm.currentPassword} onChange={e => setPwForm({ ...pwForm, currentPassword:e.target.value })} placeholder="••••••••" required style={inp}/></Input><Input label="Nova Senha"><input type="password" value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword:e.target.value })} placeholder="••••••••" required minLength={6} style={inp}/></Input><button type="submit" style={{ ...btn("#16a34a"), padding:"10px" }}>🔑 Alterar Senha</button></div></form>}

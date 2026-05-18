@@ -4,6 +4,8 @@ export const clearToken= ()       => localStorage.removeItem("h2_token");
 export const getUser   = ()       => { try { const t=getToken(); if(!t) return null; return JSON.parse(atob(t.split(".")[1])); } catch { return null; } };
 export const isAdmin   = ()       => getUser()?.role === "admin";
 
+const USER_SCOPED_LOCAL_KEYS = ["h2_favorites", "h2_scan_history", "h2_last_jobs", "h2_last_summary"];
+
 export function userStoragePrefix(user = getUser()) {
   if (!user) return "guest";
   return `user_${user.id || user.username || "unknown"}`;
@@ -24,6 +26,40 @@ export function writeScopedJson(baseKey, value, user = getUser()) {
 
 export function removeScopedItem(baseKey, user = getUser()) {
   localStorage.removeItem(scopedStorageKey(baseKey, user));
+}
+
+export function setupUserScopedLocalStorage() {
+  if (window.__h2ScopedLocalStorageInstalled) return;
+  window.__h2ScopedLocalStorageInstalled = true;
+
+  const rawGet = Storage.prototype.getItem;
+  const rawSet = Storage.prototype.setItem;
+  const rawRemove = Storage.prototype.removeItem;
+
+  function parseJwt(token) {
+    try { return JSON.parse(atob(String(token || "").split(".")[1] || "")); }
+    catch { return null; }
+  }
+
+  function scopedKey(key) {
+    if (!USER_SCOPED_LOCAL_KEYS.includes(key)) return key;
+    const token = rawGet.call(localStorage, "h2_token");
+    const user = parseJwt(token);
+    if (!user) return `${key}:guest`;
+    return `${key}:user_${user.id || user.username || "unknown"}`;
+  }
+
+  Storage.prototype.getItem = function(key) {
+    return rawGet.call(this, scopedKey(key));
+  };
+
+  Storage.prototype.setItem = function(key, value) {
+    return rawSet.call(this, scopedKey(key), value);
+  };
+
+  Storage.prototype.removeItem = function(key) {
+    return rawRemove.call(this, scopedKey(key));
+  };
 }
 
 const AI_PROXY_ROUTES = ["/api/anthropic", "/api/openrouter", "/api/openai"];

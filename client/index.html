@@ -6,9 +6,31 @@
     <title>H-2 Visa Scanner Pro</title>
     <meta name="description" content="Varredura inteligente de vagas H-2A e H-2B com validação DOL" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛂</text></svg>" />
+    <style>
+      .global-dashboard-link {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 2147483000;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(59, 130, 246, .5);
+        background: linear-gradient(135deg, rgba(15, 23, 42, .96), rgba(30, 41, 59, .96));
+        color: #dbeafe;
+        text-decoration: none;
+        font: 700 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        box-shadow: 0 16px 38px rgba(0, 0, 0, .36);
+        backdrop-filter: blur(10px);
+      }
+      .global-dashboard-link:hover { border-color: #60a5fa; color: #ffffff; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <a class="global-dashboard-link" href="/dashboard.html" title="Abrir dashboard de atividades">📊 Dashboard</a>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

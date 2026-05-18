@@ -93,6 +93,39 @@ function inferSeasonType(job) {
   return { label: "Indefinido", icon: "🗓️", color: "#94a3b8" };
 }
 
+function inferLanguagePreference(job) {
+  const raw = String(
+    job.languagePreference ||
+    job.language ||
+    job.languages ||
+    job.flags ||
+    job.contact ||
+    job.position ||
+    ""
+  ).toLowerCase();
+
+  const hasEnglish = /english|ingl[eê]s|ingles|en\b|speak english|basic english/.test(raw);
+  const hasSpanish = /spanish|espanhol|español|es\b|bilingual|bilingue|bilingüe/.test(raw);
+
+  if (hasEnglish && hasSpanish) {
+    return { label: "Inglês/Espanhol", icon: "🇺🇸🇪🇸", color: "#22c55e" };
+  }
+
+  if (hasSpanish) {
+    return { label: "Espanhol", icon: "🇪🇸", color: "#f59e0b" };
+  }
+
+  if (hasEnglish) {
+    return { label: "Inglês", icon: "🇺🇸", color: "#60a5fa" };
+  }
+
+  if (/portuguese|português|portugues|french|franc[eê]s|creole|haitian|other language/.test(raw)) {
+    return { label: "Outro idioma", icon: "🌐", color: "#a78bfa" };
+  }
+
+  return { label: "Não informado", icon: "💬", color: "#94a3b8" };
+}
+
 function themePalette(mode) {
   const light = mode === "light" || (mode === "system" && window.matchMedia?.("(prefers-color-scheme: light)")?.matches);
   return light ? { bg: "#f8fafc", panel: "#ffffff", card: "#ffffff", soft: "#eef2ff", border: "#dbe3ef", text: "#0f172a", sub: "#475569", muted: "#64748b", input: "#ffffff", shadow: "0 16px 34px rgba(15,23,42,.08)" } : { bg: "#020408", panel: "#020408", card: "#0a0a0f", soft: "#0f172a", border: "#1e293b", text: "#f1f5f9", sub: "#94a3b8", muted: "#475569", input: "#0a0a0f", shadow: "none" };
@@ -130,12 +163,12 @@ async function callAPI(provider, model, prompt) {
 }
 
 function buildPrompt(visaType, category, state, extra) {
-  return `You are an expert ${visaType} visa job researcher. Today is ${new Date().toISOString().slice(0, 10)} (${CURRENT_YEAR}).\nTASK: Find CURRENT active ${visaType} postings for 2025/2026 season in "${state}" USA.\nCATEGORY: ${category.label} — query: "${category.query}"\nSkip anything from 2024 or older.\nReturn 4-6 employers with company, title, location, openings, wage, period, seasonType, housing, DOL status, cert number, NAICS, contacts, source URL, compliance notes, risk and matchScore. Keep values concise. seasonType MUST be one of: "summer", "winter", "year_round", "unknown". Use "summer" for spring/summer/fall agricultural contracts, "winter" for winter/ski/snow contracts, "year_round" for long year-round periods, and "unknown" if unclear.\n${extra ? `EXTRA: ${extra}` : ""}\nRespond ONLY valid JSON, no markdown: {"jobs":[{"company":"","position":"","location":"","openings":"","wage":"","period":"Apr 2026 – Nov 2026","seasonType":"summer|winter|year_round|unknown","housing":"Yes|No|N/A","dolStatus":"VERIFIED|PENDING|NOT_FOUND","dolCert":"","naicsCode":"","contactName":"","contactEmail":"","contactPhone":"","contactAddress":"","agentName":"","agentEmail":"","contact":"","source":"","flags":"","risk":"LOW|MEDIUM|HIGH","matchScore":80}],"logs":["🔍 Buscando..."],"summary":{"verified":0,"pending":0,"notFound":0,"bestPick":"Empresa — motivo em português","recommendation":"2-3 frases em português"}}`;
+  return `You are an expert ${visaType} visa job researcher. Today is ${new Date().toISOString().slice(0, 10)} (${CURRENT_YEAR}).\nTASK: Find CURRENT active ${visaType} postings for 2025/2026 season in "${state}" USA.\nCATEGORY: ${category.label} — query: "${category.query}"\nSkip anything from 2024 or older.\nReturn 4-6 employers with company, title, location, openings, wage, period, seasonType, languagePreference, housing, DOL status, cert number, NAICS, contacts, source URL, compliance notes, risk and matchScore. Keep values concise. seasonType MUST be one of: "summer", "winter", "year_round", "unknown". languagePreference MUST be one of: "english", "spanish", "english_spanish", "other", "not_informed". Use job description, contact language, recruiter notes or employer hints to infer language only when reasonable. Use "not_informed" if unclear.\n${extra ? `EXTRA: ${extra}` : ""}\nRespond ONLY valid JSON, no markdown: {"jobs":[{"company":"","position":"","location":"","openings":"","wage":"","period":"Apr 2026 – Nov 2026","seasonType":"summer|winter|year_round|unknown","languagePreference":"english|spanish|english_spanish|other|not_informed","housing":"Yes|No|N/A","dolStatus":"VERIFIED|PENDING|NOT_FOUND","dolCert":"","naicsCode":"","contactName":"","contactEmail":"","contactPhone":"","contactAddress":"","agentName":"","agentEmail":"","contact":"","source":"","flags":"","risk":"LOW|MEDIUM|HIGH","matchScore":80}],"logs":["🔍 Buscando..."],"summary":{"verified":0,"pending":0,"notFound":0,"bestPick":"Empresa — motivo em português","recommendation":"2-3 frases em português"}}`;
 }
 
 function generatePDF(job, visaType, meta) {
   const safe = value => String(value || "—");
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${safe(job.company)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#172033}.box{border:1px solid #dbe3ef;border-radius:10px;padding:14px;margin:12px 0}.badge{display:inline-block;padding:4px 8px;border-radius:6px;background:#eef2ff;margin-right:6px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media print{button{display:none}}</style></head><body><h1>🛂 H-2 Visa Scanner Pro</h1><p>${visaType} · ${meta.category} · ${meta.state}</p><div class="box"><h2>${safe(job.company)}</h2><p>${safe(job.position)} · ${safe(job.location)}</p><span class="badge">${safe(job.dolStatus)}</span><span class="badge">${inferSeasonType(job).icon} ${inferSeasonType(job).label}</span><span class="badge">Risco ${safe(job.risk)}</span><span class="badge">Aderência ${safe(job.matchScore || calcMatch(job))}%</span></div><div class="grid"><div class="box"><b>Vagas</b><br>${safe(job.openings)}</div><div class="box"><b>Salário</b><br>${safe(job.wage)}</div><div class="box"><b>Período</b><br>${safe(job.period)}</div><div class="box"><b>Moradia</b><br>${safe(job.housing)}</div></div><div class="box"><b>Contato</b><br>${safe(job.contactName)} · ${safe(job.contactEmail)} · ${safe(job.contactPhone)}<br>${safe(job.contactAddress)}</div><div class="box"><b>Compliance</b><br>${safe(job.flags)}</div><div class="box"><b>Fonte</b><br>${job.source ? `<a href="${job.source}">${job.source}</a>` : "—"}</div><div class="box"><b>Checklist de segurança</b><ul>${CHECKLIST.map(i => `<li>${i}</li>`).join("")}</ul></div><p>Confirme sempre no DOL/SeasonalJobs. Não constitui aconselhamento jurídico.</p><button onclick="window.print()">Salvar como PDF</button></body></html>`;
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${safe(job.company)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#172033}.box{border:1px solid #dbe3ef;border-radius:10px;padding:14px;margin:12px 0}.badge{display:inline-block;padding:4px 8px;border-radius:6px;background:#eef2ff;margin-right:6px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media print{button{display:none}}</style></head><body><h1>🛂 H-2 Visa Scanner Pro</h1><p>${visaType} · ${meta.category} · ${meta.state}</p><div class="box"><h2>${safe(job.company)}</h2><p>${safe(job.position)} · ${safe(job.location)}</p><span class="badge">${safe(job.dolStatus)}</span><span class="badge">${inferSeasonType(job).icon} ${inferSeasonType(job).label}</span><span class="badge">${inferLanguagePreference(job).icon} ${inferLanguagePreference(job).label}</span><span class="badge">Risco ${safe(job.risk)}</span><span class="badge">Aderência ${safe(job.matchScore || calcMatch(job))}%</span></div><div class="grid"><div class="box"><b>Vagas</b><br>${safe(job.openings)}</div><div class="box"><b>Salário</b><br>${safe(job.wage)}</div><div class="box"><b>Período</b><br>${safe(job.period)}</div><div class="box"><b>Moradia</b><br>${safe(job.housing)}</div></div><div class="box"><b>Contato</b><br>${safe(job.contactName)} · ${safe(job.contactEmail)} · ${safe(job.contactPhone)}<br>${safe(job.contactAddress)}</div><div class="box"><b>Compliance</b><br>${safe(job.flags)}</div><div class="box"><b>Fonte</b><br>${job.source ? `<a href="${job.source}">${job.source}</a>` : "—"}</div><div class="box"><b>Checklist de segurança</b><ul>${CHECKLIST.map(i => `<li>${i}</li>`).join("")}</ul></div><p>Confirme sempre no DOL/SeasonalJobs. Não constitui aconselhamento jurídico.</p><button onclick="window.print()">Salvar como PDF</button></body></html>`;
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank");
@@ -158,6 +191,7 @@ function JobCard({ job, idx, vt, p, visaType, meta, isFavorite, onToggleFavorite
   const [check, setCheck] = useState(false);
   const score = job.matchScore || calcMatch(job);
   const season = inferSeasonType(job);
+  const language = inferLanguagePreference(job);
   const [dolLabel, dolColor] = DOL[job.dolStatus] || DOL.NOT_FOUND;
   const riskColor = job.risk === "LOW" ? "#22c55e" : job.risk === "HIGH" ? "#ef4444" : "#f59e0b";
   const pill = (text, color) => <span style={{ border: `1px solid ${color}`, color, padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{text}</span>;
@@ -165,7 +199,7 @@ function JobCard({ job, idx, vt, p, visaType, meta, isFavorite, onToggleFavorite
     <div onClick={() => setOpen(!open)} style={{ padding: 16, cursor: "pointer" }}>
       <div style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 7 }}><strong style={{ color: p.text, fontSize: 16, fontFamily: "'Syne',sans-serif" }}>{job.company}</strong>{pill(dolLabel, dolColor)}{pill(`${season.icon} ${season.label}`, season.color)}{pill(`Risco ${job.risk || "MEDIUM"}`, riskColor)}{pill(`Aderência ${score}%`, vt.color)}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 7 }}><strong style={{ color: p.text, fontSize: 16, fontFamily: "'Syne',sans-serif" }}>{job.company}</strong>{pill(dolLabel, dolColor)}{pill(`${season.icon} ${season.label}`, season.color)}{pill(`${language.icon} ${language.label}`, language.color)}{pill(`Risco ${job.risk || "MEDIUM"}`, riskColor)}{pill(`Aderência ${score}%`, vt.color)}</div>
           <div style={{ color: p.sub, fontSize: 12, lineHeight: 1.7 }}>💼 {job.position} · 📍 {job.location} · 👥 {job.openings} · <span style={{ color: "#22c55e" }}>💰 {job.wage}</span></div>
           <div style={{ color: p.muted, fontSize: 11 }}>📅 {job.period}{job.housing && job.housing !== "N/A" ? ` · 🏠 ${job.housing}` : ""}</div>
         </div>
@@ -277,8 +311,8 @@ export default function App() {
   };
 
   const exportCSV = () => {
-    const header = ["Empresa", "Cargo", "Local", "Vagas", "Salário", "Período", "Temporada", "DOL", "Cert", "NAICS", "Risco", "Aderência", "Fonte"];
-    const rows = jobs.map(j => [j.company, j.position, j.location, j.openings, j.wage, j.period, inferSeasonType(j).label, j.dolStatus, j.dolCert, j.naicsCode, j.risk, j.matchScore || calcMatch(j), j.source].map(v => `"${String(v || "").replace(/"/g, '""')}"`).join(","));
+    const header = ["Empresa", "Cargo", "Local", "Vagas", "Salário", "Período", "Temporada", "Idioma", "DOL", "Cert", "NAICS", "Risco", "Aderência", "Fonte"];
+    const rows = jobs.map(j => [j.company, j.position, j.location, j.openings, j.wage, j.period, inferSeasonType(j).label, inferLanguagePreference(j).label, j.dolStatus, j.dolCert, j.naicsCode, j.risk, j.matchScore || calcMatch(j), j.source].map(v => `"${String(v || "").replace(/"/g, '""')}"`).join(","));
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([[header.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `h2-${visaType}-${Date.now()}.csv`; a.click();
